@@ -28,6 +28,7 @@ const els = {
   featuresPanel: document.querySelector("#featuresPanel"),
   errorsPanel: document.querySelector("#errorsPanel"),
   themeToggle: document.querySelector("#themeToggle"),
+  treeActions: document.querySelector("#treeActions"),
 };
 
 const calcCache = {
@@ -728,7 +729,20 @@ function visibleItems() {
   return visibleAllItemsSorted();
 }
 
+function expandableItemIds() {
+  return state.data.items
+    .filter((item) => item.children.length && (item.level === 0 || !isSectorFiltered() || activeLeafItemsFor(item).length))
+    .map((item) => item.id);
+}
+
+function renderTreeActions() {
+  if (!els.treeActions) return;
+  const shouldShow = state.activeTab === "explorer" && state.levelView === "all";
+  els.treeActions.hidden = !shouldShow;
+}
+
 function renderExplorer() {
+  renderTreeActions();
   const measureTitle = {
     weight: "Wgt, %",
     price: `Price Chg, % (${state.horizon === "mom" ? "MoM" : "YoY"})`,
@@ -976,6 +990,7 @@ function renderErrors() {
 }
 
 function render() {
+  renderTreeActions();
   renderSummary();
   if (state.activeTab === "explorer") {
     renderExplorer();
@@ -1098,6 +1113,19 @@ function bindEvents() {
       render();
     });
   });
+
+  if (els.treeActions) {
+    els.treeActions.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-tree-action]");
+      if (!button || state.levelView !== "all") return;
+      if (button.dataset.treeAction === "expand") {
+        state.expanded = new Set(expandableItemIds());
+      } else {
+        state.expanded.clear();
+      }
+      renderExplorer();
+    });
+  }
 
   els.itemHead.addEventListener("contextmenu", (event) => {
     const nameHeader = event.target.closest("[data-sort-name]");

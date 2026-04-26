@@ -398,6 +398,7 @@ p {
 .content-top {
   align-items: end;
   display: flex;
+  gap: 8px;
   justify-content: space-between;
   min-height: 31px;
 }
@@ -410,6 +411,44 @@ p {
 
 .content-tabs button {
   min-width: 74px;
+}
+
+.tree-actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  margin: 0 auto 0 4px;
+}
+
+.tree-actions[hidden] {
+  display: none;
+}
+
+.tree-actions button {
+  background: color-mix(in srgb, var(--panel) 88%, var(--excel-light) 12%);
+  border: 1px solid #b8c7d4;
+  border-radius: 999px;
+  color: var(--excel-dark);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+  min-height: 22px;
+  padding: 4px 10px;
+}
+
+.tree-actions button:hover {
+  background: var(--excel-light);
+}
+
+:root[data-theme="dark"] .tree-actions button {
+  background: #1b2631;
+  border-color: #344555;
+  color: #d8e9f7;
+}
+
+:root[data-theme="dark"] .tree-actions button:hover {
+  background: #26384a;
 }
 
 .controls {
