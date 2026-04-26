@@ -1,0 +1,1197 @@
+const state = {
+  datasets: null,
+  data: null,
+  indexFamily: "CPI",
+  monthIndex: 0,
+  horizon: "mom",
+  measure: "contribution",
+  sectorView: "all",
+  coreView: "all",
+  boeView: "all",
+  timeRange: "1",
+  levelView: "all",
+  activeTab: "explorer",
+  sort: { type: "name", monthIndex: null },
+  expanded: new Set(),
+  selectedRowId: null,
+  theme: "light",
+};
+
+const els = {
+  itemHead: document.querySelector("#itemHead"),
+  itemCols: document.querySelector("#itemCols"),
+  itemTable: document.querySelector("#itemTable"),
+  itemRows: document.querySelector("#itemRows"),
+  errorRows: document.querySelector("#errorRows"),
+  valueHeader: document.querySelector("#valueHeader"),
+  explorerPanel: document.querySelector("#explorerPanel"),
+  errorsPanel: document.querySelector("#errorsPanel"),
+  themeToggle: document.querySelector("#themeToggle"),
+};
+
+const calcCache = {
+  key: "",
+  activeLeaves: null,
+  activeLeavesForItem: new Map(),
+  activeWeightTotals: new Map(),
+  subsetUnchainedJanuary: new Map(),
+  subsetUnchainedIndex: new Map(),
+  leafContributions: new Map(),
+  contributions: new Map(),
+};
+
+let errorsHtmlCache = "";
+
+const monthLabel = new Intl.DateTimeFormat("en-GB", {
+  month: "short",
+  year: "numeric",
+});
+
+function monthDate(month) {
+  return new Date(`${month}-01T00:00:00`);
+}
+
+function formatMonth(month) {
+  return monthLabel.format(monthDate(month));
+}
+
+function formatPercent(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return `${value.toFixed(3)}%`;
+}
+
+function formatContribution(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return (value * 100).toFixed(1);
+}
+
+function formatContributionForCopy(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return (value * 100).toFixed(6);
+}
+
+function formatBp(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return value.toFixed(1);
+}
+
+function formatNumber(value, decimals = 1) {
+  if (!Number.isFinite(value)) return "n/a";
+  return value.toFixed(decimals);
+}
+
+function formatWeight(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return (value / 10).toFixed(2);
+}
+
+function formatWeightForCopy(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return (value / 10).toFixed(6);
+}
+
+function priceChange(item, monthIndex, horizon) {
+  if (horizon === "mom") {
+    if (monthIndex <= 0) return NaN;
+    return ((item.prices[monthIndex] / item.prices[monthIndex - 1]) - 1) * 100;
+  }
+  if (monthIndex < 12) return NaN;
+  return ((item.prices[monthIndex] / item.prices[monthIndex - 12]) - 1) * 100;
+}
+
+function overall3dpIndex(monthIndex) {
+  const overall = state.data?.overall3dp;
+  if (!overall) return NaN;
+  const month = state.data.months[monthIndex];
+  const overallMonthIndex = overall.months.indexOf(month);
+  if (overallMonthIndex < 0) return NaN;
+  const value = overall.prices[overallMonthIndex];
+  return Number.isFinite(value) ? value : NaN;
+}
+
+function roundedHeadlineChange(monthIndex, horizon) {
+  const allItems = getAllItems();
+  if (horizon === "mom") {
+    if (monthIndex <= 0) return NaN;
+    return ((allItems.prices[monthIndex] / allItems.prices[monthIndex - 1]) - 1) * 100;
+  }
+  if (monthIndex < 12) return NaN;
+  return ((allItems.prices[monthIndex] / allItems.prices[monthIndex - 12]) - 1) * 100;
+}
+
+function actualHeadlineChange(monthIndex, horizon) {
+  const current = overall3dpIndex(monthIndex);
+  if (!Number.isFinite(current)) return roundedHeadlineChange(monthIndex, horizon);
+
+  const previousIndex = horizon === "mom" ? monthIndex - 1 : monthIndex - 12;
+  if (previousIndex < 0) return NaN;
+
+  const previous = overall3dpIndex(previousIndex);
+  if (!Number.isFinite(previous)) return roundedHeadlineChange(monthIndex, horizon);
+
+  return ((current / previous) - 1) * 100;
+}
+
+function priceMeasureValue(item, monthIndex) {
+  if (isSectorFiltered()) {
+    if (item.level === 4) return priceChange(item, monthIndex, state.horizon);
+    return aggregatePriceChange(activeLeafItemsFor(item), monthIndex, state.horizon);
+  }
+  return item.level === 0
+    ? actualHeadlineChange(monthIndex, state.horizon)
+    : priceChange(item, monthIndex, state.horizon);
+}
+
+function weightMeasureValue(item, monthIndex) {
+  if (!isSectorFiltered()) return item.weights[monthIndex];
+  const leaves = activeLeafItemsFor(item);
+  const itemWeight = activeWeightTotal(monthIndex, leaves);
+  if (!Number.isFinite(itemWeight)) return NaN;
+  return itemWeight;
+}
+
+function signedClass(value) {
+  if (!Number.isFinite(value) || Math.abs(value) < 0.0000001) return "";
+  return value > 0 ? "positive" : "negative";
+}
+
+function codePrefix(name) {
+  return (name.match(/^\s*(\d+(?:\.\d+)*)/) || [null, ""])[1];
+}
+
+function getAllItems() {
+  return state.data.items.find((item) => item.level === 0);
+}
+
+function calcCacheKey() {
+  return [
+    state.indexFamily,
+    state.horizon,
+    state.sectorView,
+    state.coreView,
+    state.boeView,
+  ].join("|");
+}
+
+function ensureCalcCache() {
+  const key = calcCacheKey();
+  if (calcCache.key === key) return calcCache;
+
+  calcCache.key = key;
+  calcCache.activeLeaves = null;
+  calcCache.activeLeavesForItem = new Map();
+  calcCache.activeWeightTotals = new Map();
+  calcCache.subsetUnchainedJanuary = new Map();
+  calcCache.subsetUnchainedIndex = new Map();
+  calcCache.leafContributions = new Map();
+  calcCache.contributions = new Map();
+  return calcCache;
+}
+
+function invalidateCalcCache() {
+  calcCache.key = "";
+}
+
+function monthParts(index) {
+  const [year, month] = state.data.months[index].split("-").map(Number);
+  return { year, month };
+}
+
+function findMonthIndex(year, month) {
+  return state.data.months.indexOf(`${year}-${String(month).padStart(2, "0")}`);
+}
+
+function buildHierarchy() {
+  const stack = [];
+  state.data.items.forEach((item, index) => {
+    item.id = index;
+    item.children = [];
+    item.prefix = codePrefix(item.name);
+    while (stack.length && stack[stack.length - 1].level >= item.level) stack.pop();
+    item.parentId = stack.length ? stack[stack.length - 1].id : null;
+    if (item.parentId !== null) state.data.items[item.parentId].children.push(item.id);
+    stack.push(item);
+  });
+
+  state.expanded = new Set([0]);
+}
+
+function setIndexFamily(indexFamily) {
+  state.indexFamily = indexFamily;
+  state.data = state.datasets[indexFamily];
+  state.monthIndex = state.data.months.length - 1;
+  state.sort = { type: "name", monthIndex: null };
+  state.selectedRowId = null;
+  invalidateCalcCache();
+  buildHierarchy();
+}
+
+function descendantsAtLevel(item, level) {
+  const out = [];
+  const stack = [...item.children];
+  while (stack.length) {
+    const id = stack.shift();
+    const child = state.data.items[id];
+    if (child.level === level) out.push(child);
+    stack.unshift(...child.children);
+  }
+  return out;
+}
+
+function leafItemsFor(item) {
+  if (item.level === 4) return [item];
+  if (item.level === 0) return state.data.items.filter((candidate) => candidate.level === 4);
+  return descendantsAtLevel(item, 4);
+}
+
+function isSectorFiltered() {
+  return state.sectorView !== "all" || state.coreView !== "all" || state.boeView !== "all";
+}
+
+function leafInActiveSectors(leaf) {
+  const sectors = leaf.sectors || {};
+  if (state.sectorView === "services" && !sectors.services) return false;
+  if (state.sectorView === "goods" && sectors.services) return false;
+  if (state.coreView === "noncore" && !sectors.nonCore) return false;
+  if (state.coreView === "core" && sectors.nonCore) return false;
+  if (state.boeView === "boe" && !sectors.boe) return false;
+  if (state.boeView === "exboe" && sectors.boe) return false;
+  return true;
+}
+
+function activeLeafItems() {
+  const cache = ensureCalcCache();
+  if (!cache.activeLeaves) {
+    cache.activeLeaves = state.data.items
+      .filter((candidate) => candidate.level === 4)
+      .filter(leafInActiveSectors);
+  }
+  return cache.activeLeaves;
+}
+
+function activeLeafItemsFor(item) {
+  const cache = ensureCalcCache();
+  if (!cache.activeLeavesForItem.has(item.id)) {
+    const leaves = leafItemsFor(item).filter(leafInActiveSectors);
+    cache.activeLeavesForItem.set(item.id, leaves);
+  }
+  return cache.activeLeavesForItem.get(item.id);
+}
+
+function activeWeightTotal(monthIndex, leaves = null) {
+  const cache = ensureCalcCache();
+  if (!leaves) {
+    if (!cache.activeWeightTotals.has(monthIndex)) {
+      cache.activeWeightTotals.set(monthIndex, activeWeightTotal(monthIndex, activeLeafItems()));
+    }
+    return cache.activeWeightTotals.get(monthIndex);
+  }
+
+  const values = leaves
+    .map((leaf) => leaf.weights[monthIndex])
+    .filter(Number.isFinite);
+  if (!values.length) return NaN;
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+function activeBasketName() {
+  const parts = [state.indexFamily];
+  if (state.coreView === "core") parts.push("Core");
+  if (state.coreView === "noncore") parts.push("Non Core");
+  if (state.sectorView === "services") parts.push("Services");
+  if (state.sectorView === "goods") parts.push("Goods");
+  if (state.boeView === "boe") parts.push("BoE Measure");
+  if (state.boeView === "exboe") parts.push("ex BoE Measure");
+  if (parts.length === 1) return getAllItems().name;
+  return `${parts.join(" ")} index`;
+}
+
+function displayName(item) {
+  return item.level === 0 ? activeBasketName() : item.name;
+}
+
+function displayWeightCode(item) {
+  return item.level === 0 && isSectorFiltered() ? "" : item.weightCode;
+}
+
+function displayPriceCode(item) {
+  return item.level === 0 && isSectorFiltered() ? "" : item.priceCode;
+}
+
+function onsSeriesUrl(code) {
+  const clean = String(code || "").trim().toLowerCase();
+  if (!clean) return "";
+  return `https://www.ons.gov.uk/economy/inflationandpriceindices/timeseries/${clean}/mm23`;
+}
+
+function codeLinkHtml(code) {
+  const clean = String(code || "").trim();
+  if (!clean) return "";
+  return `<a class="code-link" href="${onsSeriesUrl(clean)}" target="_blank" rel="noopener noreferrer">${clean}</a>`;
+}
+
+function ancestorsExpanded(item) {
+  let parentId = item.parentId;
+  while (parentId !== null) {
+    if (!state.expanded.has(parentId)) return false;
+    parentId = state.data.items[parentId].parentId;
+  }
+  return true;
+}
+
+function unchainedIndex(item, monthIndex) {
+  const { year, month } = monthParts(monthIndex);
+  const current = item.prices[monthIndex];
+  if (month === 1) {
+    const december = findMonthIndex(year - 1, 12);
+    if (december < 0) return NaN;
+    return (current / item.prices[december]) * 100;
+  }
+  const january = findMonthIndex(year, 1);
+  return (current / item.prices[january]) * 100;
+}
+
+function unchainedFromCurrentJanuary(item, monthIndex) {
+  const { year } = monthParts(monthIndex);
+  const january = findMonthIndex(year, 1);
+  return (item.prices[monthIndex] / item.prices[january]) * 100;
+}
+
+function subsetUnchainedFromCurrentJanuary(monthIndex, weightMonthIndex, leaves = activeLeafItems()) {
+  const cache = ensureCalcCache();
+  const cacheKey = `${monthIndex}|${weightMonthIndex}`;
+  if (leaves === activeLeafItems() && cache.subsetUnchainedJanuary.has(cacheKey)) {
+    return cache.subsetUnchainedJanuary.get(cacheKey);
+  }
+
+  const totalWeight = activeWeightTotal(weightMonthIndex, leaves);
+  if (!Number.isFinite(totalWeight) || totalWeight === 0) return NaN;
+
+  const values = leaves
+    .map((leaf) => {
+      const index = unchainedFromCurrentJanuary(leaf, monthIndex);
+      if (!Number.isFinite(index)) return NaN;
+      return (leaf.weights[weightMonthIndex] / totalWeight) * index;
+    })
+    .filter(Number.isFinite);
+  const value = values.length ? values.reduce((sum, value) => sum + value, 0) : NaN;
+  if (leaves === activeLeafItems()) cache.subsetUnchainedJanuary.set(cacheKey, value);
+  return value;
+}
+
+function subsetUnchainedIndex(monthIndex, weightMonthIndex, leaves = activeLeafItems()) {
+  const cache = ensureCalcCache();
+  const cacheKey = `${monthIndex}|${weightMonthIndex}`;
+  if (leaves === activeLeafItems() && cache.subsetUnchainedIndex.has(cacheKey)) {
+    return cache.subsetUnchainedIndex.get(cacheKey);
+  }
+
+  const totalWeight = activeWeightTotal(weightMonthIndex, leaves);
+  if (!Number.isFinite(totalWeight) || totalWeight === 0) return NaN;
+
+  const values = leaves
+    .map((leaf) => {
+      const index = unchainedIndex(leaf, monthIndex);
+      if (!Number.isFinite(index)) return NaN;
+      return (leaf.weights[weightMonthIndex] / totalWeight) * index;
+    })
+    .filter(Number.isFinite);
+  const value = values.length ? values.reduce((sum, value) => sum + value, 0) : NaN;
+  if (leaves === activeLeafItems()) cache.subsetUnchainedIndex.set(cacheKey, value);
+  return value;
+}
+
+function monthlyLeafContribution(item, monthIndex) {
+  if (monthIndex <= 0) return NaN;
+
+  if (isSectorFiltered()) {
+    return monthlySubsetLeafContribution(item, monthIndex, activeLeafItems());
+  }
+
+  const allItems = getAllItems();
+  const { month } = monthParts(monthIndex);
+  let itemCurrent;
+  let itemPrevious;
+  let allPrevious;
+
+  if (month === 1) {
+    itemCurrent = unchainedIndex(item, monthIndex);
+    itemPrevious = 100;
+    allPrevious = 100;
+  } else {
+    itemCurrent = unchainedFromCurrentJanuary(item, monthIndex);
+    itemPrevious = unchainedFromCurrentJanuary(item, monthIndex - 1);
+    allPrevious = unchainedFromCurrentJanuary(allItems, monthIndex - 1);
+  }
+
+  return (
+    ((itemCurrent / itemPrevious) - 1) *
+    100 *
+    (itemPrevious / allPrevious) *
+    (item.weights[monthIndex] / 1000)
+  );
+}
+
+function monthlySubsetLeafContribution(item, monthIndex, leaves) {
+  if (monthIndex <= 0) return NaN;
+
+  const selectedWeight = activeWeightTotal(monthIndex, leaves);
+  if (!Number.isFinite(selectedWeight) || selectedWeight === 0) return NaN;
+
+  const { month } = monthParts(monthIndex);
+  let itemCurrent;
+  let itemPrevious;
+  let subsetPrevious;
+
+  if (month === 1) {
+    itemCurrent = unchainedIndex(item, monthIndex);
+    itemPrevious = 100;
+    subsetPrevious = 100;
+  } else {
+    itemCurrent = unchainedFromCurrentJanuary(item, monthIndex);
+    itemPrevious = unchainedFromCurrentJanuary(item, monthIndex - 1);
+    subsetPrevious = subsetUnchainedFromCurrentJanuary(monthIndex - 1, monthIndex, leaves);
+  }
+
+  return (
+    ((itemCurrent / itemPrevious) - 1) *
+    100 *
+    (itemPrevious / subsetPrevious) *
+    (item.weights[monthIndex] / selectedWeight)
+  );
+}
+
+function annualLeafContribution(item, monthIndex) {
+  const { year, month } = monthParts(monthIndex);
+  if (monthIndex < 12) return NaN;
+
+  const allItems = getAllItems();
+  const previousMonthIndex = findMonthIndex(year - 1, month);
+  const previousDecemberIndex = findMonthIndex(year - 1, 12);
+  const currentJanuaryIndex = findMonthIndex(year, 1);
+  const currentFebruaryIndex = findMonthIndex(year, 2);
+  const previousFebruaryIndex = findMonthIndex(year - 1, 2);
+
+  if (
+    previousMonthIndex < 0 ||
+    previousDecemberIndex < 0 ||
+    currentJanuaryIndex < 0 ||
+    previousFebruaryIndex < 0
+  ) {
+    return NaN;
+  }
+
+  const denom = unchainedFromCurrentJanuary(allItems, previousMonthIndex);
+  const allPreviousDecember = unchainedFromCurrentJanuary(allItems, previousDecemberIndex);
+  const allCurrentJanuary = unchainedIndex(allItems, currentJanuaryIndex);
+
+  const itemPreviousMonth = unchainedFromCurrentJanuary(item, previousMonthIndex);
+  const itemPreviousDecember = unchainedFromCurrentJanuary(item, previousDecemberIndex);
+  const itemCurrentJanuary = unchainedIndex(item, currentJanuaryIndex);
+  const itemCurrentMonth = unchainedFromCurrentJanuary(item, monthIndex);
+
+  const previousWeight = item.weights[previousFebruaryIndex] / 1000;
+  const januaryWeight = item.weights[currentJanuaryIndex] / 1000;
+
+  const termOne =
+    previousWeight * ((itemPreviousDecember - itemPreviousMonth) / denom) * 100;
+  const termTwo =
+    januaryWeight *
+    ((itemCurrentJanuary - 100) / denom) *
+    allPreviousDecember;
+  const termThree =
+    month === 1 || currentFebruaryIndex < 0
+      ? 0
+      : (item.weights[currentFebruaryIndex] / 1000) *
+        ((itemCurrentMonth - 100) / denom) *
+        (allCurrentJanuary / 100) *
+        allPreviousDecember;
+
+  return termOne + termTwo + termThree;
+}
+
+function annualSubsetLeafContribution(item, monthIndex, leaves = activeLeafItems()) {
+  const { year, month } = monthParts(monthIndex);
+  if (monthIndex < 12) return NaN;
+
+  const previousMonthIndex = findMonthIndex(year - 1, month);
+  const previousDecemberIndex = findMonthIndex(year - 1, 12);
+  const currentJanuaryIndex = findMonthIndex(year, 1);
+  const currentFebruaryIndex = findMonthIndex(year, 2);
+  const previousFebruaryIndex = findMonthIndex(year - 1, 2);
+
+  if (
+    previousMonthIndex < 0 ||
+    previousDecemberIndex < 0 ||
+    currentJanuaryIndex < 0 ||
+    previousFebruaryIndex < 0
+  ) {
+    return NaN;
+  }
+
+  const previousWeightTotal = activeWeightTotal(previousFebruaryIndex, leaves);
+  const januaryWeightTotal = activeWeightTotal(currentJanuaryIndex, leaves);
+  const februaryWeightTotal = activeWeightTotal(currentFebruaryIndex, leaves);
+  if (
+    !Number.isFinite(previousWeightTotal) ||
+    !Number.isFinite(januaryWeightTotal) ||
+    !Number.isFinite(februaryWeightTotal) ||
+    previousWeightTotal === 0 ||
+    januaryWeightTotal === 0 ||
+    februaryWeightTotal === 0
+  ) {
+    return NaN;
+  }
+
+  const denom = subsetUnchainedFromCurrentJanuary(previousMonthIndex, previousFebruaryIndex, leaves);
+  const subsetPreviousDecember = subsetUnchainedFromCurrentJanuary(previousDecemberIndex, previousFebruaryIndex, leaves);
+  const subsetCurrentJanuary = subsetUnchainedIndex(currentJanuaryIndex, currentJanuaryIndex, leaves);
+
+  const itemPreviousMonth = unchainedFromCurrentJanuary(item, previousMonthIndex);
+  const itemPreviousDecember = unchainedFromCurrentJanuary(item, previousDecemberIndex);
+  const itemCurrentJanuary = unchainedIndex(item, currentJanuaryIndex);
+  const itemCurrentMonth = unchainedFromCurrentJanuary(item, monthIndex);
+
+  const previousWeight = item.weights[previousFebruaryIndex] / previousWeightTotal;
+  const januaryWeight = item.weights[currentJanuaryIndex] / januaryWeightTotal;
+
+  const termOne =
+    previousWeight * ((itemPreviousDecember - itemPreviousMonth) / denom) * 100;
+  const termTwo =
+    januaryWeight *
+    ((itemCurrentJanuary - 100) / denom) *
+    subsetPreviousDecember;
+  const termThree =
+    month === 1 || currentFebruaryIndex < 0
+      ? 0
+      : (item.weights[currentFebruaryIndex] / februaryWeightTotal) *
+        ((itemCurrentMonth - 100) / denom) *
+        (subsetCurrentJanuary / 100) *
+        subsetPreviousDecember;
+
+  return termOne + termTwo + termThree;
+}
+
+function aggregatePriceChange(leaves, monthIndex, horizon) {
+  if (!leaves.length) return NaN;
+  const values = leaves
+    .map((leaf) =>
+      horizon === "mom"
+        ? monthlySubsetLeafContribution(leaf, monthIndex, leaves)
+        : annualSubsetLeafContribution(leaf, monthIndex, leaves),
+    )
+    .filter(Number.isFinite);
+  if (!values.length) return NaN;
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+function leafContribution(item, monthIndex, horizon) {
+  const cache = ensureCalcCache();
+  const cacheKey = `${item.id}|${monthIndex}|${horizon}`;
+  if (cache.leafContributions.has(cacheKey)) return cache.leafContributions.get(cacheKey);
+
+  const value = isSectorFiltered() && horizon === "yoy"
+    ? annualSubsetLeafContribution(item, monthIndex)
+    : horizon === "mom"
+    ? monthlyLeafContribution(item, monthIndex)
+    : annualLeafContribution(item, monthIndex);
+  cache.leafContributions.set(cacheKey, value);
+  return value;
+}
+
+function contribution(item, monthIndex, horizon) {
+  const cache = ensureCalcCache();
+  const cacheKey = `${item.id}|${monthIndex}|${horizon}`;
+  if (cache.contributions.has(cacheKey)) return cache.contributions.get(cacheKey);
+
+  const leaves = isSectorFiltered() ? activeLeafItemsFor(item) : leafItemsFor(item);
+  const values = leaves
+    .map((leaf) => leafContribution(leaf, monthIndex, horizon))
+    .filter(Number.isFinite);
+  const value = values.length ? values.reduce((sum, value) => sum + value, 0) : NaN;
+  cache.contributions.set(cacheKey, value);
+  return value;
+}
+
+function headlineChange(monthIndex, horizon) {
+  return actualHeadlineChange(monthIndex, horizon);
+}
+
+function calculatedTotal(level, monthIndex, horizon) {
+  const items =
+    level === 0
+      ? [getAllItems()]
+      : state.data.items.filter((item) => item.level === level);
+  const values = items
+    .map((item) => contribution(item, monthIndex, horizon))
+    .filter(Number.isFinite);
+  if (!values.length) return NaN;
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+function currentCalculatedTotal() {
+  const level = state.levelView === "all" ? 0 : Number(state.levelView);
+  return calculatedTotal(level, state.monthIndex, state.horizon);
+}
+
+function rowValue(item) {
+  if (state.measure === "weight") return weightMeasureValue(item, state.monthIndex);
+  if (state.measure === "price") return priceMeasureValue(item, state.monthIndex);
+  return contribution(item, state.monthIndex, state.horizon);
+}
+
+function formattedRowValue(value) {
+  if (state.measure === "weight") return formatWeight(value);
+  if (state.measure === "price") return formatNumber(value, 2);
+  return formatContribution(value);
+}
+
+function shortMonth(month) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${names[monthNumber - 1]} ${String(year).slice(2)}`;
+}
+
+function visibleMonthIndices() {
+  const count = state.data.months.length;
+  if (state.timeRange === "all") {
+    return state.data.months.map((_, index) => index);
+  }
+  const monthsToShow = Number(state.timeRange) * 12;
+  const start = Math.max(0, count - monthsToShow);
+  return state.data.months.map((_, index) => index).slice(start);
+}
+
+function renderSummary() {
+}
+
+function sortLabel(item) {
+  return displayName(item).toLocaleLowerCase("en-GB");
+}
+
+function sortValue(item, monthIndex) {
+  if (state.measure === "weight") return weightMeasureValue(item, monthIndex);
+  if (state.measure === "price") return priceMeasureValue(item, monthIndex);
+  return contribution(item, monthIndex, state.horizon);
+}
+
+function sortedItems(items) {
+  const sorted = [...items];
+  if (state.sort.type === "month") {
+    sorted.sort((a, b) => {
+      const aValue = sortValue(a, state.sort.monthIndex);
+      const bValue = sortValue(b, state.sort.monthIndex);
+      const aFinite = Number.isFinite(aValue);
+      const bFinite = Number.isFinite(bValue);
+      if (aFinite && bFinite && bValue !== aValue) return bValue - aValue;
+      if (aFinite !== bFinite) return aFinite ? -1 : 1;
+      return sortLabel(a).localeCompare(sortLabel(b), "en-GB", { numeric: true });
+    });
+    return sorted;
+  }
+
+  sorted.sort((a, b) =>
+    sortLabel(a).localeCompare(sortLabel(b), "en-GB", { numeric: true }),
+  );
+  return sorted;
+}
+
+function visibleAllItemsSorted() {
+  const root = getAllItems();
+  const out = [];
+
+  function appendBranch(item) {
+    if (item.level !== 0 && isSectorFiltered() && !activeLeafItemsFor(item).length) return;
+    out.push(item);
+    if (!state.expanded.has(item.id)) return;
+    sortedItems(item.children.map((id) => state.data.items[id])).forEach(appendBranch);
+  }
+
+  appendBranch(root);
+  return out;
+}
+
+function visibleItems() {
+  if (state.levelView !== "all") {
+    return [
+      getAllItems(),
+      ...sortedItems(
+        state.data.items.filter(
+          (item) =>
+            item.level === Number(state.levelView) &&
+            (!isSectorFiltered() || activeLeafItemsFor(item).length),
+        ),
+      ),
+    ];
+  }
+  return visibleAllItemsSorted();
+}
+
+function renderExplorer() {
+  const measureTitle = {
+    weight: "Wgt, %",
+    price: `Price Chg, % (${state.horizon === "mom" ? "MoM" : "YoY"})`,
+    contribution: "Ctrb, bp",
+  }[state.measure];
+  els.itemRows.dataset.view = state.levelView;
+  const monthCount = visibleMonthIndices().length;
+  const tableClass =
+    monthCount <= 12 ? "range-compact" : monthCount <= 24 ? "range-two-year" : "range-scroll";
+  const fixedColumnWidth = 746;
+  document.documentElement.style.setProperty("--month-count", monthCount);
+  document.documentElement.style.setProperty("--fixed-col-width", `${fixedColumnWidth}px`);
+  document.documentElement.style.setProperty("--month-col-width", "64px");
+  els.itemTable.className = tableClass;
+
+  els.itemCols.innerHTML = `
+      <col class="col-name" />
+      <col class="col-level" />
+      <col class="col-weight-code" />
+      <col class="col-price-code" />
+      ${visibleMonthIndices().map(() => `<col class="col-month" />`).join("")}
+  `;
+
+  const monthIndices = visibleMonthIndices();
+  const nameSortIcon =
+    state.sort.type === "name" ? `<span class="sort-icon sort-icon-az" aria-label="Sorted A to Z"></span>` : "";
+  els.itemHead.innerHTML = `
+    <tr>
+      <th class="sticky-name sortable-header ${state.sort.type === "name" ? "sorted-header" : ""}" data-sort-name="true" title="Right-click to sort A to Z"><span class="header-label">Name</span>${nameSortIcon}</th>
+      <th class="meta-col">Level</th>
+      <th class="meta-col code-col">Weight Code</th>
+      <th class="meta-col code-col">Price Code</th>
+      ${monthIndices
+        .map(
+          (index) => `
+            <th class="number month-head sortable-header ${state.sort.type === "month" && state.sort.monthIndex === index ? "sorted-header" : ""}" data-sort-month="${index}" title="Right-click to sort largest to smallest">
+              <span class="month-label" title="${formatMonth(state.data.months[index])}">${shortMonth(state.data.months[index])}</span>
+              ${state.sort.type === "month" && state.sort.monthIndex === index ? `<span class="sort-icon sort-icon-desc" aria-label="Sorted largest to smallest"></span>` : ""}
+            </th>
+          `,
+        )
+        .join("")}
+    </tr>
+  `;
+
+  const rows = visibleItems()
+    .map((item) => {
+      const values = visibleMonthIndices()
+        .map((monthIndex) => {
+          let value;
+          if (state.measure === "weight") value = weightMeasureValue(item, monthIndex);
+          else if (state.measure === "price") value = priceMeasureValue(item, monthIndex);
+          else value = contribution(item, monthIndex, state.horizon);
+          return `
+            <td class="number month-cell ${state.measure === "contribution" || state.measure === "price" ? signedClass(value) : ""}">
+              ${formattedRowValue(value)}
+            </td>
+          `;
+        })
+        .join("");
+      const hasChildren = item.children.length > 0;
+      const expanded = state.expanded.has(item.id);
+      const toggle = hasChildren
+        ? `<button class="tree-toggle" data-toggle="${item.id}" aria-label="${expanded ? "Collapse" : "Expand"} ${item.name}">${expanded ? "-" : "+"}</button>`
+        : `<span class="tree-spacer"></span>`;
+      return `
+        <tr class="level-row level-${item.level} ${state.selectedRowId === item.id ? "selected-row" : ""}" data-row-id="${item.id}">
+          <td class="sticky-name">
+            <div class="tree-name" style="--depth:${item.level}">
+              ${state.levelView === "all" ? toggle : ""}
+              <span>${displayName(item)}</span>
+            </div>
+          </td>
+          <td class="meta-cell"><span class="level-pill">L${item.level}</span></td>
+          <td class="meta-cell code-cell">${codeLinkHtml(displayWeightCode(item))}</td>
+          <td class="meta-cell code-cell">${codeLinkHtml(displayPriceCode(item))}</td>
+          ${values}
+        </tr>
+      `;
+    })
+    .join("");
+
+  els.itemRows.innerHTML = rows;
+}
+
+function copyValue(item, monthIndex) {
+  if (state.measure === "weight") return formatWeightForCopy(weightMeasureValue(item, monthIndex));
+  if (state.measure === "price") return formatNumber(priceMeasureValue(item, monthIndex), 6);
+  return formatContributionForCopy(contribution(item, monthIndex, state.horizon));
+}
+
+function visibleTableTsv() {
+  const measureTitle = {
+    weight: "Wgt, %",
+    price: `Price Chg, % (${state.horizon === "mom" ? "MoM" : "YoY"})`,
+    contribution: "Ctrb, bp",
+  }[state.measure];
+  const monthIndices = visibleMonthIndices();
+  const header = ["Name", "Level", "Wgt Code", "Px Code", ...monthIndices.map((index) => shortMonth(state.data.months[index]))];
+  const rows = visibleItems().map((item) => [
+    displayName(item),
+    `L${item.level}`,
+    displayWeightCode(item),
+    displayPriceCode(item),
+    ...monthIndices.map((monthIndex) => copyValue(item, monthIndex)),
+  ]);
+  return [header, ...rows]
+    .map((row) => row.map((cell) => String(cell ?? "").replace(/\t|\r?\n/g, " ")).join("\t"))
+    .join("\n");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function visibleTableHtml() {
+  const tsv = visibleTableTsv();
+  const rows = tsv.split("\n").map((line) => line.split("\t"));
+  return `
+    <table>
+      ${rows
+        .map(
+          (row, rowIndex) => `
+            <tr>
+              ${row
+                .map((cell) =>
+                  rowIndex === 0
+                    ? `<th>${escapeHtml(cell)}</th>`
+                    : `<td>${escapeHtml(cell)}</td>`,
+                )
+                .join("")}
+            </tr>
+          `,
+        )
+        .join("")}
+    </table>
+  `;
+}
+
+function renderErrors() {
+  if (errorsHtmlCache) {
+    els.errorRows.innerHTML = errorsHtmlCache;
+    return;
+  }
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function withDataset(indexFamily, callback) {
+    const previous = {
+      data: state.data,
+      indexFamily: state.indexFamily,
+      sectorView: state.sectorView,
+      coreView: state.coreView,
+      boeView: state.boeView,
+      expanded: new Set(state.expanded),
+    };
+    state.indexFamily = indexFamily;
+    state.data = state.datasets[indexFamily];
+    state.sectorView = "all";
+    state.coreView = "all";
+    state.boeView = "all";
+    invalidateCalcCache();
+    buildHierarchy();
+    const result = callback();
+    state.data = previous.data;
+    state.indexFamily = previous.indexFamily;
+    state.sectorView = previous.sectorView;
+    state.coreView = previous.coreView;
+    state.boeView = previous.boeView;
+    invalidateCalcCache();
+    buildHierarchy();
+    state.expanded = previous.expanded;
+    return result;
+  }
+
+  function errorFor(year, monthNumber, horizon) {
+    const monthKey = `${year}-${String(monthNumber).padStart(2, "0")}`;
+    const index = findMonthIndex(Number(year), monthNumber);
+    if (state.data.months[index] !== monthKey) return NaN;
+    if (index < 0) return NaN;
+    const actual = headlineChange(index, horizon);
+    const calculated = calculatedTotal(0, index, horizon);
+    if (!Number.isFinite(actual) || !Number.isFinite(calculated)) return NaN;
+    return (calculated - actual) * 100;
+  }
+
+  function heatClass(value) {
+    if (!Number.isFinite(value)) return "empty";
+    const abs = Math.abs(value);
+    if (abs < 0.5) return "neutral";
+    if (abs < 2) return value > 0 ? "pos-low" : "neg-low";
+    if (abs < 5) return value > 0 ? "pos-mid" : "neg-mid";
+    return value > 0 ? "pos-high" : "neg-high";
+  }
+
+  function grid(indexFamily, horizon) {
+    return withDataset(indexFamily, () => {
+      const years = [...new Set(state.data.months.map((month) => month.slice(0, 4)))];
+      const title = `${indexFamily} ${horizon === "mom" ? "MoM" : "YoY"} Error, bp`;
+
+      return `
+        <section class="error-grid-card">
+          <h2>${title}</h2>
+          <table class="error-grid">
+            <thead>
+              <tr>
+                <th>Month</th>
+                ${years.map((year) => `<th>${year}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${monthNames
+                .map(
+                  (monthName, monthIndex) => `
+                    <tr>
+                      <th>${monthName}</th>
+                      ${years
+                        .map((year) => {
+                          const value = errorFor(year, monthIndex + 1, horizon);
+                          return `<td class="${heatClass(value)}">${Number.isFinite(value) ? formatBp(value) : ""}</td>`;
+                        })
+                        .join("")}
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </section>
+      `;
+    });
+  }
+
+  errorsHtmlCache = `
+    ${grid("CPI", "mom")}
+    ${grid("CPI", "yoy")}
+    ${grid("CPIH", "mom")}
+    ${grid("CPIH", "yoy")}
+  `;
+  els.errorRows.innerHTML = errorsHtmlCache;
+}
+
+function render() {
+  renderSummary();
+  if (state.activeTab === "errors") {
+    renderErrors();
+  } else {
+    renderExplorer();
+  }
+}
+
+function setActiveButtons(selector, value, attr) {
+  document.querySelectorAll(selector).forEach((button) => {
+    button.classList.toggle("active", button.dataset[attr] === value);
+  });
+}
+
+function checkRadio(selector) {
+  const input = document.querySelector(selector);
+  if (input) input.checked = true;
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = state.theme;
+  els.themeToggle.setAttribute("aria-pressed", String(state.theme === "dark"));
+}
+
+function selectExplorerTable() {
+  if (state.activeTab !== "explorer") return false;
+  const selection = window.getSelection();
+  if (!selection) return false;
+
+  const range = document.createRange();
+  range.selectNodeContents(els.itemTable);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return true;
+}
+
+function isEditableTarget(target) {
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
+function bindEvents() {
+  document.querySelectorAll("[data-horizon]").forEach((button) => {
+    button.addEventListener("change", () => {
+      state.horizon = button.dataset.horizon;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-index-family]").forEach((button) => {
+    button.addEventListener("change", () => {
+      if (!button.checked || !state.datasets[button.dataset.indexFamily]) return;
+      setIndexFamily(button.dataset.indexFamily);
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-measure]").forEach((button) => {
+    button.addEventListener("change", () => {
+      state.measure = button.dataset.measure;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-sector-view]").forEach((button) => {
+    button.addEventListener("change", () => {
+      state.sectorView = button.dataset.sectorView;
+      state.sort = { type: "name", monthIndex: null };
+      state.selectedRowId = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-core-view]").forEach((button) => {
+    button.addEventListener("change", () => {
+      state.coreView = button.dataset.coreView;
+      state.sort = { type: "name", monthIndex: null };
+      state.selectedRowId = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-boe-view]").forEach((button) => {
+    button.addEventListener("change", () => {
+      state.boeView = button.dataset.boeView;
+      if (state.boeView !== "all") {
+        state.sectorView = "all";
+        state.coreView = "all";
+        checkRadio('[data-sector-view="all"]');
+        checkRadio('[data-core-view="all"]');
+      }
+      state.sort = { type: "name", monthIndex: null };
+      state.selectedRowId = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-time-range]").forEach((button) => {
+    const updateRange = () => {
+      state.timeRange = button.dataset.timeRange;
+      render();
+    };
+    button.addEventListener("change", updateRange);
+    button.addEventListener("click", updateRange);
+  });
+
+  document.querySelectorAll("[data-level-view]").forEach((button) => {
+    button.addEventListener("change", () => {
+      state.levelView = button.dataset.levelView;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeTab = button.dataset.tab;
+      setActiveButtons("[data-tab]", state.activeTab, "tab");
+      els.explorerPanel.classList.toggle("active", state.activeTab === "explorer");
+      els.errorsPanel.classList.toggle("active", state.activeTab === "errors");
+      render();
+    });
+  });
+
+  els.itemHead.addEventListener("contextmenu", (event) => {
+    const nameHeader = event.target.closest("[data-sort-name]");
+    const monthHeader = event.target.closest("[data-sort-month]");
+    if (!nameHeader && !monthHeader) return;
+
+    event.preventDefault();
+    if (nameHeader) {
+      state.sort = { type: "name", monthIndex: null };
+    } else {
+      state.sort = { type: "month", monthIndex: Number(monthHeader.dataset.sortMonth) };
+    }
+    renderExplorer();
+  });
+
+  els.itemRows.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-toggle]");
+    if (button) {
+      const id = Number(button.dataset.toggle);
+      if (state.expanded.has(id)) state.expanded.delete(id);
+      else state.expanded.add(id);
+      renderExplorer();
+      return;
+    }
+    const row = event.target.closest("[data-row-id]");
+    if (!row) return;
+    const id = Number(row.dataset.rowId);
+    state.selectedRowId = state.selectedRowId === id ? null : id;
+    renderExplorer();
+  });
+
+  els.themeToggle.addEventListener("click", () => {
+    state.theme = state.theme === "light" ? "dark" : "light";
+    applyTheme();
+  });
+
+  window.addEventListener("copy", (event) => {
+    if (!state.data) return;
+    event.clipboardData.setData("text/plain", visibleTableTsv());
+    event.clipboardData.setData("text/html", visibleTableHtml());
+    event.preventDefault();
+  }, true);
+
+  window.addEventListener("keydown", (event) => {
+    const isSelectAll = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a";
+    if (!isSelectAll || isEditableTarget(event.target)) return;
+    if (!selectExplorerTable()) return;
+    event.preventDefault();
+  });
+
+}
+
+async function loadData() {
+  try {
+    const appScript = document.querySelector('script[src*="app.js"]');
+    const appBase = appScript ? new URL(".", appScript.src) : new URL(".", window.location.href);
+    const dataUrl = new URL(`data/cpih.json?v=${Date.now()}`, appBase);
+    const response = await fetch(dataUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Data request failed: ${response.status}`);
+    return response.json();
+  } catch (error) {
+    if (window.CPIH_DATA) return window.CPIH_DATA;
+    throw error;
+  }
+}
+
+function normalizePayload(payload) {
+  if (payload?.series?.CPIH || payload?.series?.CPI) return payload.series;
+  return { CPIH: payload };
+}
+
+async function init() {
+  try {
+    applyTheme();
+    state.datasets = normalizePayload(await loadData());
+    const indexParam = new URLSearchParams(window.location.search).get("index")?.toUpperCase();
+    if (indexParam && state.datasets[indexParam]) {
+      state.indexFamily = indexParam;
+      const indexInput = document.querySelector(`[data-index-family="${indexParam}"]`);
+      if (indexInput) indexInput.checked = true;
+    }
+    setIndexFamily(state.indexFamily);
+    const rangeParam = new URLSearchParams(window.location.search).get("range");
+    if (["1", "2", "5", "10", "all"].includes(rangeParam)) {
+      state.timeRange = rangeParam;
+      const rangeInput = document.querySelector(`[data-time-range="${rangeParam}"]`);
+      if (rangeInput) rangeInput.checked = true;
+    }
+    bindEvents();
+    render();
+  } catch (error) {
+    document.body.insertAdjacentHTML(
+      "afterbegin",
+      `<div class="load-error">Data load failed: ${error.message}</div>`,
+    );
+  }
+}
+
+init();

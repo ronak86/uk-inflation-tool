@@ -1,0 +1,150 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UK Inflation</title>
+    <link rel="stylesheet" href="web/styles.css?v=github-pages" />
+  </head>
+  <body>
+    <main class="app">
+      <!--
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">C</div>
+          <div>
+          <h1>UK CPIH Contributions</h1>
+          <p id="subtitle">Rounded public ONS weights and indices, Jan 2015 to Dec 2025</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false" title="Toggle light and dark mode">
+            <span class="sun" aria-hidden="true">â˜€</span>
+            <span class="moon" aria-hidden="true">â—</span>
+          </button>
+        </div>
+      </header>
+      -->
+
+      <section class="workspace">
+        <aside class="controls" aria-label="Controls">
+          <div class="panel-tools">
+            <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false" title="Toggle light and dark mode">
+              <span class="sun" aria-hidden="true"></span>
+              <span class="moon" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <div class="control-group">
+            <span class="label">Last</span>
+            <div class="radio-row vertical" role="radiogroup" aria-label="Time range">
+              <label><input type="radio" name="timeRange" value="1" data-time-range="1" checked /> <span>1 year</span></label>
+              <label><input type="radio" name="timeRange" value="2" data-time-range="2" /> <span>2 years</span></label>
+              <label><input type="radio" name="timeRange" value="5" data-time-range="5" /> <span>5 years</span></label>
+              <label><input type="radio" name="timeRange" value="10" data-time-range="10" /> <span>10 years</span></label>
+              <label><input type="radio" name="timeRange" value="all" data-time-range="all" /> <span>All</span></label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="label">Index</span>
+            <div class="radio-row" role="radiogroup" aria-label="Index family">
+              <label><input type="radio" name="indexFamily" value="CPI" data-index-family="CPI" checked /> <span>CPI</span></label>
+              <label><input type="radio" name="indexFamily" value="CPIH" data-index-family="CPIH" /> <span>CPIH</span></label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="label">Change</span>
+            <div class="radio-row" role="radiogroup" aria-label="Change type">
+              <label><input type="radio" name="horizon" value="mom" data-horizon="mom" checked /> <span>MoM</span></label>
+              <label><input type="radio" name="horizon" value="yoy" data-horizon="yoy" /> <span>YoY</span></label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="label">Sector</span>
+            <div class="radio-row vertical" role="radiogroup" aria-label="Goods and services">
+              <label><input type="radio" name="sectorView" value="all" data-sector-view="all" checked /> <span>All</span></label>
+              <label><input type="radio" name="sectorView" value="services" data-sector-view="services" /> <span>Services</span></label>
+              <label><input type="radio" name="sectorView" value="goods" data-sector-view="goods" /> <span>Goods</span></label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="label">Core</span>
+            <div class="radio-row vertical" role="radiogroup" aria-label="Core and non-core">
+              <label><input type="radio" name="coreView" value="all" data-core-view="all" checked /> <span>All</span></label>
+              <label><input type="radio" name="coreView" value="core" data-core-view="core" /> <span>Core</span></label>
+              <label><input type="radio" name="coreView" value="noncore" data-core-view="noncore" /> <span>Non Core</span></label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="label">BoE</span>
+            <div class="radio-row vertical" role="radiogroup" aria-label="Bank of England measure">
+              <label><input type="radio" name="boeView" value="all" data-boe-view="all" checked /> <span>All</span></label>
+              <label><input type="radio" name="boeView" value="boe" data-boe-view="boe" /> <span>BoE Measure</span></label>
+              <label><input type="radio" name="boeView" value="exboe" data-boe-view="exboe" /> <span>All exc BoE Measure</span></label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="label">Measure</span>
+            <div class="radio-row vertical" role="radiogroup" aria-label="Measure">
+              <label><input type="radio" name="measure" value="contribution" data-measure="contribution" checked /> <span>Ctrb, bp</span></label>
+              <label><input type="radio" name="measure" value="price" data-measure="price" /> <span>Price Change, %</span></label>
+              <label><input type="radio" name="measure" value="weight" data-measure="weight" /> <span>Weight, %</span></label>
+            </div>
+          </div>
+
+          <div class="control-group level-control">
+            <span class="label">Level</span>
+            <div class="radio-row level-grid" role="radiogroup" aria-label="Basket level">
+              <label><input type="radio" name="levelView" value="all" data-level-view="all" checked /> <span>All</span></label>
+              <label><input type="radio" name="levelView" value="1" data-level-view="1" /> <span>L1</span></label>
+              <label><input type="radio" name="levelView" value="2" data-level-view="2" /> <span>L2</span></label>
+              <label><input type="radio" name="levelView" value="3" data-level-view="3" /> <span>L3</span></label>
+              <label><input type="radio" name="levelView" value="4" data-level-view="4" /> <span>L4</span></label>
+            </div>
+          </div>
+
+        </aside>
+
+        <div class="content">
+          <div class="content-top">
+            <nav class="tabs chrome-tabs content-tabs" aria-label="Views">
+              <button class="active" data-tab="explorer">Explorer</button>
+              <button data-tab="errors">Errors</button>
+            </nav>
+            <div class="credit">
+              <div>Ronak Chitroda 2026</div>
+              <a href="mailto:ronak@chitroda.com?subject=UK%20Inflation%20Tool">ronak@chitroda.com</a>
+            </div>
+          </div>
+
+          <section class="panel active" id="explorerPanel">
+            <div class="table-shell">
+              <table id="itemTable">
+                <colgroup id="itemCols"></colgroup>
+                <thead id="itemHead"></thead>
+                <tbody id="itemRows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel" id="errorsPanel">
+            <div class="error-note">
+              The errors tab compares the calculated sum of Level 4 contributions with the headline inflation rate derived from the published overall index. Small differences arise because the public weights and index values are rounded, so component-level calculations will not always add exactly to the official headline rate.
+            </div>
+            <div class="error-grids" id="errorRows"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="web/data/cpih-data.js?v=github-pages"></script>
+    <script src="web/app.js?v=github-pages"></script>
+  </body>
+</html>
+
