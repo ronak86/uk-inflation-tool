@@ -28,7 +28,6 @@ const els = {
   featuresPanel: document.querySelector("#featuresPanel"),
   errorsPanel: document.querySelector("#errorsPanel"),
   themeToggle: document.querySelector("#themeToggle"),
-  treeActions: document.querySelector("#treeActions"),
 };
 
 const calcCache = {
@@ -735,14 +734,7 @@ function expandableItemIds() {
     .map((item) => item.id);
 }
 
-function renderTreeActions() {
-  if (!els.treeActions) return;
-  const shouldShow = state.activeTab === "explorer" && state.levelView === "all";
-  els.treeActions.hidden = !shouldShow;
-}
-
 function renderExplorer() {
-  renderTreeActions();
   const measureTitle = {
     weight: "Wgt, %",
     price: `Price Chg, % (${state.horizon === "mom" ? "MoM" : "YoY"})`,
@@ -769,9 +761,18 @@ function renderExplorer() {
   const monthIndices = visibleMonthIndices();
   const nameSortIcon =
     state.sort.type === "name" ? `<span class="sort-icon sort-icon-az" aria-label="Sorted A to Z"></span>` : "";
+  const treeActions =
+    state.levelView === "all"
+      ? `
+        <span class="header-tree-actions" aria-label="Tree controls">
+          <button type="button" data-tree-action="expand" title="Expand all" aria-label="Expand all">+</button>
+          <button type="button" data-tree-action="collapse" title="Collapse all" aria-label="Collapse all">-</button>
+        </span>
+      `
+      : "";
   els.itemHead.innerHTML = `
     <tr>
-      <th class="sticky-name sortable-header ${state.sort.type === "name" ? "sorted-header" : ""}" data-sort-name="true" title="Right-click to sort A to Z"><span class="header-label">Name</span>${nameSortIcon}</th>
+      <th class="sticky-name sortable-header ${state.sort.type === "name" ? "sorted-header" : ""}" data-sort-name="true" title="Right-click to sort A to Z"><span class="header-label">Name</span>${treeActions}${nameSortIcon}</th>
       <th class="meta-col">Level</th>
       <th class="meta-col code-col">Weight Code</th>
       <th class="meta-col code-col">Price Code</th>
@@ -990,7 +991,6 @@ function renderErrors() {
 }
 
 function render() {
-  renderTreeActions();
   renderSummary();
   if (state.activeTab === "explorer") {
     renderExplorer();
@@ -1114,19 +1114,6 @@ function bindEvents() {
     });
   });
 
-  if (els.treeActions) {
-    els.treeActions.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-tree-action]");
-      if (!button || state.levelView !== "all") return;
-      if (button.dataset.treeAction === "expand") {
-        state.expanded = new Set(expandableItemIds());
-      } else {
-        state.expanded.clear();
-      }
-      renderExplorer();
-    });
-  }
-
   els.itemHead.addEventListener("contextmenu", (event) => {
     const nameHeader = event.target.closest("[data-sort-name]");
     const monthHeader = event.target.closest("[data-sort-month]");
@@ -1137,6 +1124,18 @@ function bindEvents() {
       state.sort = { type: "name", monthIndex: null };
     } else {
       state.sort = { type: "month", monthIndex: Number(monthHeader.dataset.sortMonth) };
+    }
+    renderExplorer();
+  });
+
+  els.itemHead.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-tree-action]");
+    if (!button || state.levelView !== "all") return;
+    event.stopPropagation();
+    if (button.dataset.treeAction === "expand") {
+      state.expanded = new Set(expandableItemIds());
+    } else {
+      state.expanded.clear();
     }
     renderExplorer();
   });

@@ -413,42 +413,44 @@ p {
   min-width: 74px;
 }
 
-.tree-actions {
+.header-tree-actions {
   align-items: center;
-  display: flex;
-  gap: 4px;
-  margin: 0 auto 0 4px;
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 7px;
+  vertical-align: middle;
 }
 
-.tree-actions[hidden] {
-  display: none;
-}
-
-.tree-actions button {
-  background: color-mix(in srgb, var(--panel) 88%, var(--excel-light) 12%);
-  border: 1px solid #b8c7d4;
-  border-radius: 999px;
+.header-tree-actions button {
+  align-items: center;
+  background: color-mix(in srgb, #ffffff 88%, var(--excel-light) 12%);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 50%;
   color: var(--excel-dark);
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 750;
+  display: inline-grid;
+  font-size: 12px;
+  font-weight: 900;
+  height: 15px;
   line-height: 1;
-  min-height: 22px;
-  padding: 4px 10px;
+  padding: 0;
+  place-items: center;
+  width: 15px;
 }
 
-.tree-actions button:hover {
-  background: var(--excel-light);
+.header-tree-actions button:hover {
+  background: #ffffff;
+  color: #0c4f83;
 }
 
-:root[data-theme="dark"] .tree-actions button {
-  background: #1b2631;
-  border-color: #344555;
-  color: #d8e9f7;
+:root[data-theme="dark"] .header-tree-actions button {
+  background: #d8e9f7;
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #0b4c6f;
 }
 
-:root[data-theme="dark"] .tree-actions button:hover {
-  background: #26384a;
+:root[data-theme="dark"] .header-tree-actions button:hover {
+  background: #ffffff;
 }
 
 .controls {
