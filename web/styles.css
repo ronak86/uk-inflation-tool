@@ -425,17 +425,17 @@ p {
   align-items: center;
   background: color-mix(in srgb, #ffffff 88%, var(--excel-light) 12%);
   border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 50%;
+  border-radius: 999px;
   color: var(--excel-dark);
   cursor: pointer;
   display: inline-grid;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 900;
   height: 15px;
   line-height: 1;
-  padding: 0;
+  padding: 0 5px;
   place-items: center;
-  width: 15px;
+  width: auto;
 }
 
 .header-tree-actions button:hover {

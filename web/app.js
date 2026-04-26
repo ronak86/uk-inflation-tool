@@ -765,8 +765,8 @@ function renderExplorer() {
     state.levelView === "all"
       ? `
         <span class="header-tree-actions" aria-label="Tree controls">
-          <button type="button" data-tree-action="expand" title="Expand all" aria-label="Expand all">+</button>
-          <button type="button" data-tree-action="collapse" title="Collapse all" aria-label="Collapse all">-</button>
+          <button type="button" data-tree-action="expand" title="Expand all" aria-label="Expand all">Expand All</button>
+          <button type="button" data-tree-action="collapse" title="Collapse all" aria-label="Collapse all">Collapse All</button>
         </span>
       `
       : "";
@@ -1135,7 +1135,7 @@ function bindEvents() {
     if (button.dataset.treeAction === "expand") {
       state.expanded = new Set(expandableItemIds());
     } else {
-      state.expanded.clear();
+      state.expanded = new Set([getAllItems().id]);
     }
     renderExplorer();
   });
