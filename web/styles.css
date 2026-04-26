@@ -607,6 +607,43 @@ p {
   display: block;
 }
 
+.features-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  margin-top: 8px;
+  max-width: 1040px;
+  padding: 14px 16px;
+}
+
+.features-card h2 {
+  color: var(--excel-dark);
+  font-size: 18px;
+  margin: 0 0 10px;
+}
+
+.features-grid {
+  display: grid;
+  gap: 14px 22px;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+}
+
+.features-grid h3 {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.features-grid ul {
+  margin: 0;
+  padding-left: 17px;
+}
+
+.features-grid li {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .table-shell {
   border-radius: 6px;
   margin-top: 0;

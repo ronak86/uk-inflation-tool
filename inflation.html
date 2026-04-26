@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>UK Inflation</title>
-    <link rel="stylesheet" href="web/styles.css?v=github-pages" />
+    <link rel="stylesheet" href="web/styles.css?v=features-tab" />
   </head>
   <body>
     <main class="app">
@@ -115,6 +115,7 @@
           <div class="content-top">
             <nav class="tabs chrome-tabs content-tabs" aria-label="Views">
               <button class="active" data-tab="explorer">Explorer</button>
+              <button data-tab="features">Features</button>
               <button data-tab="errors">Errors</button>
             </nav>
             <div class="credit">
@@ -133,6 +134,50 @@
             </div>
           </section>
 
+          <section class="panel" id="featuresPanel">
+            <div class="features-card">
+              <h2>Features</h2>
+              <div class="features-grid">
+                <div>
+                  <h3>Inflation Views</h3>
+                  <ul>
+                    <li>CPI and CPIH</li>
+                    <li>Month-on-month and year-on-year views</li>
+                    <li>Weights, price changes, and contribution estimates</li>
+                    <li>Full basket drill-down from headline to item level</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3>Custom Baskets</h3>
+                  <ul>
+                    <li>Services vs goods</li>
+                    <li>Core vs non-core</li>
+                    <li>BoE measure and ex-BoE views</li>
+                    <li>Reconstructed sub-index price changes</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3>Workflow</h3>
+                  <ul>
+                    <li>Copy/paste neatly into Excel</li>
+                    <li>Links back to ONS time series from weight and price codes</li>
+                    <li>Right-click month headers to sort largest to smallest</li>
+                    <li>Right-click Name to return to alphabetical/order view</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3>Checks</h3>
+                  <ul>
+                    <li>Error checks against headline inflation</li>
+                    <li>CPI and CPIH MoM and YoY error grids</li>
+                    <li>Errors shown in basis points</li>
+                    <li>Best used on desktop</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="panel" id="errorsPanel">
             <div class="error-note">
               The errors tab compares the calculated sum of Level 4 contributions with the headline inflation rate derived from the published overall index. Small differences arise because the public weights and index values are rounded, so component-level calculations will not always add exactly to the official headline rate.
@@ -143,8 +188,8 @@
       </section>
     </main>
 
-    <script src="web/data/cpih-data.js?v=github-pages"></script>
-    <script src="web/app.js?v=github-pages"></script>
+    <script src="web/data/cpih-data.js?v=features-tab"></script>
+    <script src="web/app.js?v=features-tab"></script>
   </body>
 </html>
 

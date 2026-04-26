@@ -25,6 +25,7 @@ const els = {
   errorRows: document.querySelector("#errorRows"),
   valueHeader: document.querySelector("#valueHeader"),
   explorerPanel: document.querySelector("#explorerPanel"),
+  featuresPanel: document.querySelector("#featuresPanel"),
   errorsPanel: document.querySelector("#errorsPanel"),
   themeToggle: document.querySelector("#themeToggle"),
 };
@@ -976,10 +977,10 @@ function renderErrors() {
 
 function render() {
   renderSummary();
-  if (state.activeTab === "errors") {
-    renderErrors();
-  } else {
+  if (state.activeTab === "explorer") {
     renderExplorer();
+  } else if (state.activeTab === "errors") {
+    renderErrors();
   }
 }
 
@@ -1092,6 +1093,7 @@ function bindEvents() {
       state.activeTab = button.dataset.tab;
       setActiveButtons("[data-tab]", state.activeTab, "tab");
       els.explorerPanel.classList.toggle("active", state.activeTab === "explorer");
+      els.featuresPanel.classList.toggle("active", state.activeTab === "features");
       els.errorsPanel.classList.toggle("active", state.activeTab === "errors");
       render();
     });
