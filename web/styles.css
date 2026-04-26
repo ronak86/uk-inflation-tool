@@ -623,6 +623,19 @@ p {
   margin: 0 0 10px;
 }
 
+.features-source {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: -4px 0 12px;
+}
+
+.features-source a {
+  color: #0057b8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .features-grid {
   display: grid;
   gap: 14px 22px;
