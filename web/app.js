@@ -185,6 +185,11 @@ function previousJanuaryIndex(year) {
   return findMonthIndex(year - 1, 1);
 }
 
+function monthlyWeightIndex(monthIndex) {
+  const { month } = monthParts(monthIndex);
+  return isRpi() && month === 1 ? monthIndex - 1 : monthIndex;
+}
+
 function calcCacheKey() {
   return [
     state.indexFamily,
@@ -465,14 +470,15 @@ function monthlyLeafContribution(item, monthIndex) {
     ((itemCurrent / itemPrevious) - 1) *
     100 *
     (itemPrevious / allPrevious) *
-    (item.weights[monthIndex] / 1000)
+    (item.weights[monthlyWeightIndex(monthIndex)] / 1000)
   );
 }
 
 function monthlySubsetLeafContribution(item, monthIndex, leaves) {
   if (monthIndex <= 0) return NaN;
 
-  const selectedWeight = activeWeightTotal(monthIndex, leaves);
+  const weightIndex = monthlyWeightIndex(monthIndex);
+  const selectedWeight = activeWeightTotal(weightIndex, leaves);
   if (!Number.isFinite(selectedWeight) || selectedWeight === 0) return NaN;
 
   const { month } = monthParts(monthIndex);
@@ -499,7 +505,7 @@ function monthlySubsetLeafContribution(item, monthIndex, leaves) {
     ((itemCurrent / itemPrevious) - 1) *
     100 *
     (itemPrevious / subsetPrevious) *
-    (item.weights[monthIndex] / selectedWeight)
+    (item.weights[weightIndex] / selectedWeight)
   );
 }
 
