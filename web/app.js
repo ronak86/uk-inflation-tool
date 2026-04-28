@@ -105,6 +105,56 @@ function formatAxisValue(value) {
   return value.toFixed(2);
 }
 
+function niceTickStep(span, targetTicks = 5) {
+  if (!Number.isFinite(span) || span <= 0) return 1;
+  const roughStep = span / Math.max(1, targetTicks - 1);
+  const power = 10 ** Math.floor(Math.log10(roughStep));
+  const scaled = roughStep / power;
+  const niceScaled = scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10;
+  return niceScaled * power;
+}
+
+function niceChartScale(values, targetTicks = 7, options = {}) {
+  const finite = values.filter(Number.isFinite);
+  if (!finite.length) return { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1] };
+
+  const dataMin = Math.min(...finite);
+  const dataMax = Math.max(...finite);
+  if (dataMin === dataMax) {
+    if (dataMin === 0) return { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1] };
+    const pad = Math.abs(dataMin) * 0.12 || 1;
+    return niceChartScale([dataMin - pad, dataMax + pad], targetTicks);
+  }
+
+  let min = dataMin;
+  let max = dataMax;
+  const forceZeroMin = options.forceZeroMin && dataMax > 0;
+  const isPositiveOnly = dataMin >= 0 || forceZeroMin;
+  const isNegativeOnly = dataMax <= 0;
+
+  if (isPositiveOnly) {
+    min = 0;
+  } else if (isNegativeOnly) {
+    max = 0;
+  } else {
+    const pad = (dataMax - dataMin) * 0.08;
+    min -= pad;
+    max += pad;
+  }
+
+  const step = niceTickStep(max - min, targetTicks);
+  const niceMin = isPositiveOnly ? 0 : Math.floor(min / step) * step;
+  const niceMax = isNegativeOnly ? 0 : Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let tick = niceMin; tick <= niceMax + step * 0.5; tick += step) {
+    ticks.push(Math.abs(tick) < step / 1000000 ? 0 : tick);
+  }
+  if (!ticks.some((tick) => Math.abs(tick) < 0.000001)) ticks.push(0);
+  ticks.sort((a, b) => a - b);
+
+  return { min: niceMin, max: niceMax, ticks };
+}
+
 function formatWeight(value) {
   if (!Number.isFinite(value)) return "n/a";
   return (value / 10).toFixed(2);
@@ -1185,30 +1235,18 @@ function renderChart() {
     return;
   }
 
-  let min = Math.min(...finite);
-  let max = Math.max(...finite);
-  if (min === max) {
-    min -= 1;
-    max += 1;
-  }
-  const pad = (max - min) * 0.08;
-  min -= pad;
-  max += pad;
-  if (min > 0) min = 0;
-  if (max < 0) max = 0;
+  const forceZeroMin = ["contribution-cumulative", "index", "weight"].includes(state.chart.mode);
+  const scale = niceChartScale(finite, 7, { forceZeroMin });
+  const { min, max, ticks } = scale;
+  const plotValue = (value) => (forceZeroMin ? Math.max(0, value) : value);
 
   const x = (i) => margin.left + (months.length <= 1 ? 0 : (i / (months.length - 1)) * plotWidth);
   const y = (value) => margin.top + ((max - value) / (max - min)) * plotHeight;
   const zeroY = y(0);
   const path = values
-    .map((value, i) => (Number.isFinite(value) ? `${i === 0 ? "M" : "L"} ${x(i).toFixed(2)} ${y(value).toFixed(2)}` : ""))
+    .map((value, i) => (Number.isFinite(value) ? `${i === 0 ? "M" : "L"} ${x(i).toFixed(2)} ${y(plotValue(value)).toFixed(2)}` : ""))
     .filter(Boolean)
     .join(" ");
-  const rawTicks = Array.from({ length: 5 }, (_, i) => min + ((max - min) * i) / 4);
-  if (!rawTicks.some((tick) => Math.abs(tick) < 0.000001)) rawTicks.push(0);
-  const ticks = rawTicks
-    .sort((a, b) => a - b)
-    .filter((tick, index, list) => index === 0 || Math.abs(tick - list[index - 1]) > 0.000001);
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const tickTarget = 13;
   const tickStep = Math.max(1, Math.ceil(months.length / tickTarget));
@@ -1250,7 +1288,7 @@ function renderChart() {
     <line class="chart-axis" x1="${margin.left}" x2="${width - margin.right}" y1="${height - margin.bottom}" y2="${height - margin.bottom}" />
     <path class="chart-line" d="${path}" />
     ${values
-      .map((value, i) => Number.isFinite(value) ? `<circle class="chart-point" cx="${x(i)}" cy="${y(value)}" r="3" data-chart-month="${escapeHtml(formatMonth(state.data.months[months[i]]))}" data-chart-value="${formatAxisValue(value)}" data-chart-label="${escapeHtml(chartModeLabel(state.chart.mode))}"></circle>` : "")
+      .map((value, i) => Number.isFinite(value) ? `<circle class="chart-point" cx="${x(i)}" cy="${y(plotValue(value))}" r="3" data-chart-month="${escapeHtml(formatMonth(state.data.months[months[i]]))}" data-chart-value="${formatAxisValue(value)}" data-chart-label="${escapeHtml(chartModeLabel(state.chart.mode))}"></circle>` : "")
       .join("")}
     ${monthLabels}
     <g class="chart-legend">
