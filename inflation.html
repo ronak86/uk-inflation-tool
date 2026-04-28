@@ -131,6 +131,7 @@
           <div class="content-top">
             <nav class="tabs chrome-tabs content-tabs" aria-label="Views">
               <button class="active" data-tab="explorer">Explorer</button>
+              <button data-tab="chart" id="chartTab" hidden>Chart</button>
               <button data-tab="features">Features</button>
               <button data-tab="errors">Errors</button>
             </nav>
@@ -147,6 +148,19 @@
                 <thead id="itemHead"></thead>
                 <tbody id="itemRows"></tbody>
               </table>
+            </div>
+          </section>
+
+          <section class="panel" id="chartPanel">
+            <div class="chart-card">
+              <div class="chart-head">
+                <div>
+                  <h2 id="chartTitle">Chart</h2>
+                  <p id="chartSubtitle"></p>
+                </div>
+                <button type="button" id="chartClose" aria-label="Close chart">Close</button>
+              </div>
+              <svg id="chartSvg" class="chart-svg" role="img" aria-labelledby="chartTitle"></svg>
             </div>
           </section>
 
@@ -209,6 +223,8 @@
         </div>
       </section>
     </main>
+
+    <div class="context-menu" id="chartContextMenu" hidden></div>
 
     <script src="web/data/cpih-data.js?v=rpi-local"></script>
     <script src="web/app.js?v=rpi-local"></script>

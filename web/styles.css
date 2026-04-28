@@ -706,6 +706,129 @@ body.resizing-controls {
   display: block;
 }
 
+.context-menu {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  min-width: 180px;
+  overflow: hidden;
+  padding: 4px;
+  position: fixed;
+  z-index: 1000;
+}
+
+.context-menu button {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--ink);
+  cursor: pointer;
+  display: block;
+  font-size: 12px;
+  padding: 7px 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.context-menu button:hover {
+  background: var(--excel-light);
+}
+
+.chart-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  margin-top: 8px;
+  overflow: auto;
+}
+
+.chart-head {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+}
+
+.chart-head h2 {
+  color: var(--excel-dark);
+  font-size: 15px;
+  margin: 0;
+}
+
+.chart-head p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 2px 0 0;
+}
+
+.chart-head button {
+  background: color-mix(in srgb, var(--panel) 88%, var(--excel-light) 12%);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--excel-dark);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+  padding: 4px 10px;
+}
+
+.chart-svg {
+  display: block;
+  height: calc(100vh - 88px);
+  min-height: 460px;
+  min-width: 100%;
+}
+
+.chart-bg {
+  fill: var(--panel);
+}
+
+.chart-grid {
+  stroke: color-mix(in srgb, var(--line) 70%, transparent);
+  stroke-width: 1;
+}
+
+.chart-axis,
+.chart-year-split {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart-zero {
+  stroke: var(--bad);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--excel-dark);
+  stroke-linejoin: round;
+  stroke-width: 2.25;
+}
+
+.chart-point {
+  fill: var(--accent-3);
+  stroke: var(--excel-dark);
+  stroke-width: 1;
+}
+
+.chart-y-label,
+.chart-x-month,
+.chart-x-year,
+.chart-empty {
+  fill: var(--ink);
+  font-size: 10px;
+}
+
+.chart-x-year {
+  font-weight: 800;
+}
+
 .features-card {
   background: var(--panel);
   border: 1px solid var(--line);

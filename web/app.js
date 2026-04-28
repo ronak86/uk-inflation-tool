@@ -11,6 +11,8 @@ const state = {
   timeRange: "1",
   levelView: "all",
   activeTab: "explorer",
+  chart: null,
+  contextRowId: null,
   sort: { type: "name", monthIndex: null },
   expanded: new Set(),
   selectedRowId: null,
@@ -25,6 +27,13 @@ const els = {
   errorRows: document.querySelector("#errorRows"),
   valueHeader: document.querySelector("#valueHeader"),
   explorerPanel: document.querySelector("#explorerPanel"),
+  chartPanel: document.querySelector("#chartPanel"),
+  chartTab: document.querySelector("#chartTab"),
+  chartTitle: document.querySelector("#chartTitle"),
+  chartSubtitle: document.querySelector("#chartSubtitle"),
+  chartSvg: document.querySelector("#chartSvg"),
+  chartClose: document.querySelector("#chartClose"),
+  chartContextMenu: document.querySelector("#chartContextMenu"),
   featuresPanel: document.querySelector("#featuresPanel"),
   errorsPanel: document.querySelector("#errorsPanel"),
   themeToggle: document.querySelector("#themeToggle"),
@@ -84,6 +93,14 @@ function formatBp(value) {
 function formatNumber(value, decimals = 1) {
   if (!Number.isFinite(value)) return "n/a";
   return value.toFixed(decimals);
+}
+
+function formatAxisValue(value) {
+  if (!Number.isFinite(value)) return "";
+  const abs = Math.abs(value);
+  if (abs >= 100) return value.toFixed(0);
+  if (abs >= 10) return value.toFixed(1);
+  return value.toFixed(2);
 }
 
 function formatWeight(value) {
@@ -365,6 +382,15 @@ function codeLinkHtml(code) {
   const clean = String(code || "").trim();
   if (!clean) return "";
   return `<a class="code-link" href="${onsSeriesUrl(clean)}" target="_blank" rel="noopener noreferrer">${clean}</a>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function ancestorsExpanded(item) {
@@ -937,7 +963,7 @@ function renderExplorer() {
         ? `<button class="tree-toggle" data-toggle="${item.id}" aria-label="${expanded ? "Collapse" : "Expand"} ${item.name}">${expanded ? "-" : "+"}</button>`
         : `<span class="tree-spacer"></span>`;
       return `
-        <tr class="level-row level-${item.level} ${state.selectedRowId === item.id ? "selected-row" : ""}" data-row-id="${item.id}">
+        <tr class="level-row level-${item.level} ${state.selectedRowId === item.id ? "selected-row" : ""}" data-row-id="${item.id}" data-chart-row="true">
           <td class="sticky-name">
             <div class="tree-name" style="--depth:${item.level}">
               ${state.levelView === "all" ? toggle : ""}
@@ -1011,6 +1037,190 @@ function visibleTableHtml() {
         )
         .join("")}
     </table>
+  `;
+}
+
+function fullMonthIndices() {
+  return state.data.months.map((_, index) => index);
+}
+
+function chartValue(item, monthIndex, mode) {
+  if (mode === "weight") return weightMeasureValue(item, monthIndex) / 10;
+  if (mode === "contribution") return contribution(item, monthIndex, state.horizon) * 100;
+  if (mode === "contribution-cumulative") {
+    return fullMonthIndices()
+      .filter((index) => index <= monthIndex)
+      .reduce((sum, index) => {
+        const value = contribution(item, index, state.horizon);
+        return Number.isFinite(value) ? sum + value * 100 : sum;
+      }, 0);
+  }
+  if (mode === "price-change") return priceMeasureValue(item, monthIndex);
+  if (mode === "price-index") {
+    const base = item.prices[0];
+    const current = item.prices[monthIndex];
+    if (!Number.isFinite(base) || !Number.isFinite(current) || base === 0) return NaN;
+    return (current / base) * 100;
+  }
+  return NaN;
+}
+
+function chartModeLabel(mode) {
+  return {
+    weight: "Weight, %",
+    contribution: `Contribution, bp (${state.horizon === "mom" ? "MoM" : "YoY"})`,
+    "contribution-cumulative": `Cumulative contribution, bp (${state.horizon === "mom" ? "MoM" : "YoY"})`,
+    "price-change": `Price change, % (${state.horizon === "mom" ? "MoM" : "YoY"})`,
+    "price-index": "Index, Jan 2015 = 100",
+  }[mode] || "Chart";
+}
+
+function setActiveTab(tab) {
+  state.activeTab = tab;
+  setActiveButtons("[data-tab]", state.activeTab, "tab");
+  els.explorerPanel.classList.toggle("active", state.activeTab === "explorer");
+  els.chartPanel?.classList.toggle("active", state.activeTab === "chart");
+  els.featuresPanel.classList.toggle("active", state.activeTab === "features");
+  els.errorsPanel.classList.toggle("active", state.activeTab === "errors");
+  render();
+}
+
+function openChart(item, mode) {
+  state.chart = {
+    itemId: item.id,
+    mode,
+    indexFamily: state.indexFamily,
+    horizon: state.horizon,
+    measure: state.measure,
+    sectorView: state.sectorView,
+    coreView: state.coreView,
+    boeView: state.boeView,
+  };
+  if (els.chartTab) els.chartTab.hidden = false;
+  setActiveTab("chart");
+}
+
+function hideChartContextMenu() {
+  if (!els.chartContextMenu) return;
+  els.chartContextMenu.hidden = true;
+  els.chartContextMenu.innerHTML = "";
+  state.contextRowId = null;
+}
+
+function showChartContextMenu(event, item) {
+  if (!els.chartContextMenu) return;
+  state.contextRowId = item.id;
+  const options =
+    state.measure === "weight"
+      ? [{ mode: "weight", label: "Weight change over time" }]
+      : state.measure === "price"
+      ? [
+          { mode: "price-change", label: "Price Change %" },
+          { mode: "price-index", label: "Index (Rebased to Jan 2015)" },
+        ]
+      : [
+          { mode: "contribution", label: "Non cumulative" },
+          { mode: "contribution-cumulative", label: "Cumulative" },
+        ];
+
+  els.chartContextMenu.innerHTML = options
+    .map((option) => `<button type="button" data-chart-mode="${option.mode}">${escapeHtml(option.label)}</button>`)
+    .join("");
+  els.chartContextMenu.style.left = `${event.clientX}px`;
+  els.chartContextMenu.style.top = `${event.clientY}px`;
+  els.chartContextMenu.hidden = false;
+}
+
+function renderChart() {
+  if (!state.chart || !els.chartSvg) return;
+  const item = state.data.items[state.chart.itemId];
+  if (!item) return;
+
+  const width = Math.max(1200, state.data.months.length * 34 + 120);
+  const height = Math.max(460, els.chartSvg.clientHeight || 560);
+  const margin = { top: 28, right: 28, bottom: 76, left: 72 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const months = fullMonthIndices();
+  const values = months.map((monthIndex) => chartValue(item, monthIndex, state.chart.mode));
+  const finite = values.filter(Number.isFinite);
+  if (!finite.length) {
+    els.chartSvg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    els.chartSvg.innerHTML = `<text x="24" y="40" class="chart-empty">No chartable values</text>`;
+    return;
+  }
+
+  let min = Math.min(...finite);
+  let max = Math.max(...finite);
+  if (min === max) {
+    min -= 1;
+    max += 1;
+  }
+  const pad = (max - min) * 0.08;
+  min -= pad;
+  max += pad;
+  if (min > 0 && ["contribution", "price-change"].includes(state.chart.mode)) min = 0;
+  if (max < 0 && ["contribution", "price-change"].includes(state.chart.mode)) max = 0;
+
+  const x = (i) => margin.left + (months.length <= 1 ? 0 : (i / (months.length - 1)) * plotWidth);
+  const y = (value) => margin.top + ((max - value) / (max - min)) * plotHeight;
+  const zeroY = y(0);
+  const path = values
+    .map((value, i) => (Number.isFinite(value) ? `${i === 0 ? "M" : "L"} ${x(i).toFixed(2)} ${y(value).toFixed(2)}` : ""))
+    .filter(Boolean)
+    .join(" ");
+  const ticks = Array.from({ length: 5 }, (_, i) => min + ((max - min) * i) / 4);
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const yearGroups = [];
+  let currentYear = null;
+  let startIndex = 0;
+  state.data.months.forEach((month, i) => {
+    const year = month.slice(0, 4);
+    if (year !== currentYear) {
+      if (currentYear !== null) yearGroups.push({ year: currentYear, start: startIndex, end: i - 1 });
+      currentYear = year;
+      startIndex = i;
+    }
+  });
+  yearGroups.push({ year: currentYear, start: startIndex, end: state.data.months.length - 1 });
+
+  const monthLabels = months
+    .map((monthIndex, i) => {
+      const monthNumber = Number(state.data.months[monthIndex].slice(5, 7));
+      return `<text class="chart-x-month" x="${x(i)}" y="${height - 38}" text-anchor="middle">${monthNames[monthNumber - 1]}</text>`;
+    })
+    .join("");
+  const yearLabels = yearGroups
+    .map((group) => {
+      const mid = (group.start + group.end) / 2;
+      return `
+        <line class="chart-year-split" x1="${x(group.start)}" x2="${x(group.start)}" y1="${height - 63}" y2="${height - 48}" />
+        <text class="chart-x-year" x="${x(mid)}" y="${height - 16}" text-anchor="middle">${group.year}</text>
+      `;
+    })
+    .join("");
+  const yGrid = ticks
+    .map((tick) => `
+      <line class="chart-grid" x1="${margin.left}" x2="${width - margin.right}" y1="${y(tick)}" y2="${y(tick)}" />
+      <text class="chart-y-label" x="${margin.left - 10}" y="${y(tick) + 4}" text-anchor="end">${formatAxisValue(tick)}</text>
+    `)
+    .join("");
+
+  els.chartTitle.textContent = `${displayName(item)} - ${chartModeLabel(state.chart.mode)}`;
+  els.chartSubtitle.textContent = `${state.indexFamily}, full history, ${state.data.months[0]} to ${state.data.months[state.data.months.length - 1]}`;
+  els.chartSvg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  els.chartSvg.innerHTML = `
+    <rect class="chart-bg" x="0" y="0" width="${width}" height="${height}" />
+    ${yGrid}
+    ${min < 0 && max > 0 ? `<line class="chart-zero" x1="${margin.left}" x2="${width - margin.right}" y1="${zeroY}" y2="${zeroY}" />` : ""}
+    <line class="chart-axis" x1="${margin.left}" x2="${margin.left}" y1="${margin.top}" y2="${height - margin.bottom}" />
+    <line class="chart-axis" x1="${margin.left}" x2="${width - margin.right}" y1="${height - margin.bottom}" y2="${height - margin.bottom}" />
+    <path class="chart-line" d="${path}" />
+    ${values
+      .map((value, i) => Number.isFinite(value) ? `<circle class="chart-point" cx="${x(i)}" cy="${y(value)}" r="2"><title>${shortMonth(state.data.months[i])}: ${formatAxisValue(value)}</title></circle>` : "")
+      .join("")}
+    ${monthLabels}
+    ${yearLabels}
   `;
 }
 
@@ -1133,6 +1343,8 @@ function render() {
   renderSummary();
   if (state.activeTab === "explorer") {
     renderExplorer();
+  } else if (state.activeTab === "chart") {
+    renderChart();
   } else if (state.activeTab === "errors") {
     renderErrors();
   }
@@ -1332,12 +1544,8 @@ function bindEvents() {
 
   document.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.activeTab = button.dataset.tab;
-      setActiveButtons("[data-tab]", state.activeTab, "tab");
-      els.explorerPanel.classList.toggle("active", state.activeTab === "explorer");
-      els.featuresPanel.classList.toggle("active", state.activeTab === "features");
-      els.errorsPanel.classList.toggle("active", state.activeTab === "errors");
-      render();
+      if (button.dataset.tab === "chart" && !state.chart) return;
+      setActiveTab(button.dataset.tab);
     });
   });
 
@@ -1381,6 +1589,38 @@ function bindEvents() {
     const id = Number(row.dataset.rowId);
     state.selectedRowId = state.selectedRowId === id ? null : id;
     renderExplorer();
+  });
+
+  els.itemRows.addEventListener("contextmenu", (event) => {
+    const row = event.target.closest("[data-chart-row]");
+    if (!row) return;
+    event.preventDefault();
+    const id = Number(row.dataset.rowId);
+    const item = state.data.items[id];
+    if (!item) return;
+    showChartContextMenu(event, item);
+  });
+
+  els.chartContextMenu?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chart-mode]");
+    if (!button) return;
+    const item = state.data.items[state.contextRowId];
+    hideChartContextMenu();
+    if (item) openChart(item, button.dataset.chartMode);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("#chartContextMenu")) hideChartContextMenu();
+  });
+
+  window.addEventListener("resize", () => {
+    if (state.activeTab === "chart") renderChart();
+  });
+
+  els.chartClose?.addEventListener("click", () => {
+    state.chart = null;
+    if (els.chartTab) els.chartTab.hidden = true;
+    setActiveTab("explorer");
   });
 
   els.themeToggle.addEventListener("click", () => {
