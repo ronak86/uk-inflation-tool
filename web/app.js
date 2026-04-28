@@ -28,7 +28,12 @@ const els = {
   featuresPanel: document.querySelector("#featuresPanel"),
   errorsPanel: document.querySelector("#errorsPanel"),
   themeToggle: document.querySelector("#themeToggle"),
+  panelResizer: document.querySelector("#panelResizer"),
 };
+
+const controlsWidthStorageKey = "ukInflationControlsWidth";
+const controlsWidthMin = 150;
+const controlsWidthMax = 340;
 
 const calcCache = {
   key: "",
@@ -1189,6 +1194,64 @@ function isEditableTarget(target) {
   return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 }
 
+function clampControlsWidth(width) {
+  return Math.max(controlsWidthMin, Math.min(controlsWidthMax, width));
+}
+
+function setControlsWidth(width, persist = false) {
+  const clamped = clampControlsWidth(width);
+  document.documentElement.style.setProperty("--controls-width", `${clamped}px`);
+  if (persist) {
+    try {
+      localStorage.setItem(controlsWidthStorageKey, String(Math.round(clamped)));
+    } catch {
+      // Local storage may be unavailable in some embedded browser contexts.
+    }
+  }
+}
+
+function restoreControlsWidth() {
+  try {
+    const stored = Number(localStorage.getItem(controlsWidthStorageKey));
+    if (Number.isFinite(stored)) setControlsWidth(stored);
+  } catch {
+    return;
+  }
+}
+
+function bindPanelResizer() {
+  if (!els.panelResizer) return;
+  let startX = 0;
+  let startWidth = 0;
+
+  const onMove = (event) => {
+    setControlsWidth(startWidth + event.clientX - startX);
+  };
+
+  const onUp = () => {
+    document.body.classList.remove("resizing-controls");
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    const current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--controls-width"));
+    if (Number.isFinite(current)) setControlsWidth(current, true);
+  };
+
+  els.panelResizer.addEventListener("pointerdown", (event) => {
+    startX = event.clientX;
+    startWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--controls-width")) || controlsWidthMin;
+    document.body.classList.add("resizing-controls");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  });
+
+  els.panelResizer.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    const current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--controls-width")) || controlsWidthMin;
+    setControlsWidth(current + (event.key === "ArrowRight" ? 12 : -12), true);
+  });
+}
+
 function bindEvents() {
   document.querySelectorAll("[data-horizon]").forEach((button) => {
     button.addEventListener("change", () => {
@@ -1333,6 +1396,7 @@ function bindEvents() {
     event.preventDefault();
   });
 
+  bindPanelResizer();
 }
 
 async function loadData() {
@@ -1357,6 +1421,7 @@ function normalizePayload(payload) {
 async function init() {
   try {
     applyTheme();
+    restoreControlsWidth();
     state.datasets = normalizePayload(await loadData());
     const indexParam = new URLSearchParams(window.location.search).get("index")?.toUpperCase();
     if (indexParam && state.datasets[indexParam]) {

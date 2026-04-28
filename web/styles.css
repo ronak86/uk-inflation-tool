@@ -29,6 +29,7 @@
   --row-3: #ddebf7;
   --row-4: #f2f2f2;
   --stripe: #ddebf7;
+  --controls-width: 160px;
 }
 
 :root[data-theme="dark"] {
@@ -415,12 +416,41 @@ p {
 .workspace {
   align-items: start;
   display: grid;
-  gap: 8px;
-  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 0;
+  grid-template-columns: var(--controls-width) 8px minmax(0, 1fr);
 }
 
 .content {
   min-width: 0;
+}
+
+.panel-resizer {
+  align-self: stretch;
+  cursor: col-resize;
+  min-height: 100vh;
+  position: relative;
+}
+
+.panel-resizer::before {
+  background: color-mix(in srgb, var(--line) 82%, var(--excel-dark) 18%);
+  border-radius: 999px;
+  content: "";
+  inset: 8px 3px;
+  opacity: 0.55;
+  position: absolute;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.panel-resizer:hover::before,
+.panel-resizer:focus-visible::before,
+body.resizing-controls .panel-resizer::before {
+  background: var(--excel-dark);
+  opacity: 0.95;
+}
+
+body.resizing-controls {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .content-top {
