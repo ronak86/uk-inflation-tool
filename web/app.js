@@ -34,6 +34,7 @@ const els = {
   chartSvg: document.querySelector("#chartSvg"),
   chartClose: document.querySelector("#chartClose"),
   chartContextMenu: document.querySelector("#chartContextMenu"),
+  chartTooltip: document.querySelector("#chartTooltip"),
   featuresPanel: document.querySelector("#featuresPanel"),
   errorsPanel: document.querySelector("#errorsPanel"),
   themeToggle: document.querySelector("#themeToggle"),
@@ -97,6 +98,7 @@ function formatNumber(value, decimals = 1) {
 
 function formatAxisValue(value) {
   if (!Number.isFinite(value)) return "";
+  if (Math.abs(value) < 0.000001) return "0";
   const abs = Math.abs(value);
   if (abs >= 100) return value.toFixed(0);
   if (abs >= 10) return value.toFixed(1);
@@ -1121,6 +1123,22 @@ function hideChartContextMenu() {
   state.contextRowId = null;
 }
 
+function showChartTooltip(event, point) {
+  if (!els.chartTooltip) return;
+  const month = point.dataset.chartMonth;
+  const value = point.dataset.chartValue;
+  const label = point.dataset.chartLabel;
+  els.chartTooltip.innerHTML = `<strong>${escapeHtml(month)}</strong><span>${escapeHtml(label)}: ${escapeHtml(value)}</span>`;
+  els.chartTooltip.style.left = `${event.clientX + 12}px`;
+  els.chartTooltip.style.top = `${event.clientY + 12}px`;
+  els.chartTooltip.hidden = false;
+}
+
+function hideChartTooltip() {
+  if (!els.chartTooltip) return;
+  els.chartTooltip.hidden = true;
+}
+
 function showChartContextMenu(event, item) {
   if (!els.chartContextMenu) return;
   state.contextRowId = item.id;
@@ -1138,7 +1156,10 @@ function showChartContextMenu(event, item) {
         ];
 
   els.chartContextMenu.innerHTML = options
-    .map((option) => `<button type="button" data-chart-mode="${option.mode}">${escapeHtml(option.label)}</button>`)
+    .map(
+      (option, index) =>
+        `${index === 0 ? `<div class="context-menu-title">Plot Chart</div>` : ""}<button type="button" data-chart-mode="${option.mode}">${escapeHtml(option.label)}</button>`,
+    )
     .join("");
   els.chartContextMenu.style.left = `${event.clientX}px`;
   els.chartContextMenu.style.top = `${event.clientY}px`;
@@ -1173,8 +1194,8 @@ function renderChart() {
   const pad = (max - min) * 0.08;
   min -= pad;
   max += pad;
-  if (min > 0 && ["contribution", "price-change"].includes(state.chart.mode)) min = 0;
-  if (max < 0 && ["contribution", "price-change"].includes(state.chart.mode)) max = 0;
+  if (min > 0) min = 0;
+  if (max < 0) max = 0;
 
   const x = (i) => margin.left + (months.length <= 1 ? 0 : (i / (months.length - 1)) * plotWidth);
   const y = (value) => margin.top + ((max - value) / (max - min)) * plotHeight;
@@ -1183,7 +1204,11 @@ function renderChart() {
     .map((value, i) => (Number.isFinite(value) ? `${i === 0 ? "M" : "L"} ${x(i).toFixed(2)} ${y(value).toFixed(2)}` : ""))
     .filter(Boolean)
     .join(" ");
-  const ticks = Array.from({ length: 5 }, (_, i) => min + ((max - min) * i) / 4);
+  const rawTicks = Array.from({ length: 5 }, (_, i) => min + ((max - min) * i) / 4);
+  if (!rawTicks.some((tick) => Math.abs(tick) < 0.000001)) rawTicks.push(0);
+  const ticks = rawTicks
+    .sort((a, b) => a - b)
+    .filter((tick, index, list) => index === 0 || Math.abs(tick - list[index - 1]) > 0.000001);
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const tickTarget = 13;
   const tickStep = Math.max(1, Math.ceil(months.length / tickTarget));
@@ -1220,12 +1245,12 @@ function renderChart() {
     <text class="chart-main-title" x="${width / 2}" y="28" text-anchor="middle">${escapeHtml(seriesLabel)}</text>
     <text class="chart-y-title" x="${margin.left - 48}" y="${margin.top - 12}">${escapeHtml(chartModeLabel(state.chart.mode))}</text>
     ${yGrid}
-    ${min < 0 && max > 0 ? `<line class="chart-zero" x1="${margin.left}" x2="${width - margin.right}" y1="${zeroY}" y2="${zeroY}" />` : ""}
+    <line class="chart-zero" x1="${margin.left}" x2="${width - margin.right}" y1="${zeroY}" y2="${zeroY}" />
     <line class="chart-axis" x1="${margin.left}" x2="${margin.left}" y1="${margin.top}" y2="${height - margin.bottom}" />
     <line class="chart-axis" x1="${margin.left}" x2="${width - margin.right}" y1="${height - margin.bottom}" y2="${height - margin.bottom}" />
     <path class="chart-line" d="${path}" />
     ${values
-      .map((value, i) => Number.isFinite(value) ? `<circle class="chart-point" cx="${x(i)}" cy="${y(value)}" r="2"><title>${shortMonth(state.data.months[i])}: ${formatAxisValue(value)}</title></circle>` : "")
+      .map((value, i) => Number.isFinite(value) ? `<circle class="chart-point" cx="${x(i)}" cy="${y(value)}" r="3" data-chart-month="${escapeHtml(formatMonth(state.data.months[months[i]]))}" data-chart-value="${formatAxisValue(value)}" data-chart-label="${escapeHtml(chartModeLabel(state.chart.mode))}"></circle>` : "")
       .join("")}
     ${monthLabels}
     <g class="chart-legend">
@@ -1634,6 +1659,17 @@ function bindEvents() {
     if (els.chartTab) els.chartTab.hidden = true;
     setActiveTab("explorer");
   });
+
+  els.chartSvg?.addEventListener("pointermove", (event) => {
+    const point = event.target.closest(".chart-point");
+    if (!point) {
+      hideChartTooltip();
+      return;
+    }
+    showChartTooltip(event, point);
+  });
+
+  els.chartSvg?.addEventListener("pointerleave", hideChartTooltip);
 
   els.themeToggle.addEventListener("click", () => {
     state.theme = state.theme === "light" ? "dark" : "light";

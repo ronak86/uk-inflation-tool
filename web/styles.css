@@ -735,6 +735,35 @@ body.resizing-controls {
   background: var(--excel-light);
 }
 
+.context-menu-title {
+  color: #0057b8;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 8px 5px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chart-tooltip {
+  background: #ffffff;
+  border: 1px solid #8899a8;
+  border-radius: 4px;
+  box-shadow: 0 8px 22px rgba(15, 32, 45, 0.22);
+  color: #0a1720;
+  font-size: 12px;
+  line-height: 1.35;
+  max-width: 260px;
+  padding: 7px 8px;
+  pointer-events: none;
+  position: fixed;
+  z-index: 1100;
+}
+
+.chart-tooltip strong,
+.chart-tooltip span {
+  display: block;
+}
+
 .chart-card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -794,13 +823,12 @@ body.resizing-controls {
 
 .chart-axis,
 .chart-year-split {
-  stroke: var(--line);
+  stroke: #000000;
   stroke-width: 1;
 }
 
 .chart-zero {
-  stroke: var(--bad);
-  stroke-dasharray: 4 4;
+  stroke: #000000;
   stroke-width: 1;
 }
 
@@ -814,7 +842,14 @@ body.resizing-controls {
 .chart-point {
   fill: #0078bf;
   stroke: #0078bf;
+  cursor: crosshair;
   stroke-width: 1;
+}
+
+.chart-point:hover {
+  fill: #f5b700;
+  stroke: #0a1720;
+  stroke-width: 1.5;
 }
 
 .chart-y-label,
