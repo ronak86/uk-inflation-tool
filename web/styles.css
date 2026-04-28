@@ -738,10 +738,10 @@ body.resizing-controls {
 .chart-card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 0;
   box-shadow: var(--shadow);
   margin-top: 8px;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .chart-head {
@@ -780,7 +780,7 @@ body.resizing-controls {
   display: block;
   height: calc(100vh - 88px);
   min-height: 460px;
-  min-width: 100%;
+  width: 100%;
 }
 
 .chart-bg {
@@ -806,26 +806,53 @@ body.resizing-controls {
 
 .chart-line {
   fill: none;
-  stroke: var(--excel-dark);
+  stroke: #0078bf;
   stroke-linejoin: round;
-  stroke-width: 2.25;
+  stroke-width: 3;
 }
 
 .chart-point {
-  fill: var(--accent-3);
-  stroke: var(--excel-dark);
+  fill: #0078bf;
+  stroke: #0078bf;
   stroke-width: 1;
 }
 
 .chart-y-label,
 .chart-x-month,
 .chart-x-year,
+.chart-y-title,
+.chart-main-title,
 .chart-empty {
-  fill: var(--ink);
+  fill: #536879;
   font-size: 10px;
 }
 
+.chart-y-title {
+  font-size: 11px;
+}
+
+.chart-main-title {
+  fill: #0a1720;
+  font-size: 18px;
+  font-weight: 500;
+}
+
 .chart-x-year {
+  font-weight: 400;
+}
+
+.chart-legend line {
+  stroke: #0078bf;
+  stroke-width: 3;
+}
+
+.chart-legend circle {
+  fill: #0078bf;
+}
+
+.chart-legend text {
+  fill: #0a1720;
+  font-size: 11px;
   font-weight: 800;
 }
 

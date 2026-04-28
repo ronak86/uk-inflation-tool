@@ -1075,6 +1075,20 @@ function chartModeLabel(mode) {
   }[mode] || "Chart";
 }
 
+function chartSeriesLabel(item, mode) {
+  const measure =
+    mode === "weight"
+      ? "WEIGHT"
+      : mode === "price-index"
+      ? "INDEX"
+      : mode === "price-change"
+      ? "PRICE CHANGE"
+      : mode === "contribution-cumulative"
+      ? "CUMULATIVE CONTRIBUTION"
+      : "CONTRIBUTION";
+  return `${state.indexFamily} ${measure} ${displayName(item).toUpperCase()} ${mode === "price-index" ? "2015=100" : ""}`.trim();
+}
+
 function setActiveTab(tab) {
   state.activeTab = tab;
   setActiveButtons("[data-tab]", state.activeTab, "tab");
@@ -1136,9 +1150,9 @@ function renderChart() {
   const item = state.data.items[state.chart.itemId];
   if (!item) return;
 
-  const width = Math.max(1200, state.data.months.length * 34 + 120);
+  const width = 1200;
   const height = Math.max(460, els.chartSvg.clientHeight || 560);
-  const margin = { top: 28, right: 28, bottom: 76, left: 72 };
+  const margin = { top: 52, right: 28, bottom: 84, left: 72 };
   const plotWidth = width - margin.left - margin.right;
   const plotHeight = height - margin.top - margin.bottom;
   const months = fullMonthIndices();
@@ -1171,31 +1185,22 @@ function renderChart() {
     .join(" ");
   const ticks = Array.from({ length: 5 }, (_, i) => min + ((max - min) * i) / 4);
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const yearGroups = [];
-  let currentYear = null;
-  let startIndex = 0;
-  state.data.months.forEach((month, i) => {
-    const year = month.slice(0, 4);
-    if (year !== currentYear) {
-      if (currentYear !== null) yearGroups.push({ year: currentYear, start: startIndex, end: i - 1 });
-      currentYear = year;
-      startIndex = i;
-    }
-  });
-  yearGroups.push({ year: currentYear, start: startIndex, end: state.data.months.length - 1 });
-
-  const monthLabels = months
-    .map((monthIndex, i) => {
+  const tickTarget = 13;
+  const tickStep = Math.max(1, Math.ceil(months.length / tickTarget));
+  const xTicks = months
+    .map((monthIndex, i) => ({ monthIndex, i }))
+    .filter(({ i }) => i === 0 || i % tickStep === 0);
+  const lastTick = xTicks[xTicks.length - 1];
+  if (!lastTick || months.length - 1 - lastTick.i >= Math.ceil(tickStep * 0.65)) {
+    xTicks.push({ monthIndex: months[months.length - 1], i: months.length - 1 });
+  }
+  const monthLabels = xTicks
+    .map(({ monthIndex, i }) => {
       const monthNumber = Number(state.data.months[monthIndex].slice(5, 7));
-      return `<text class="chart-x-month" x="${x(i)}" y="${height - 38}" text-anchor="middle">${monthNames[monthNumber - 1]}</text>`;
-    })
-    .join("");
-  const yearLabels = yearGroups
-    .map((group) => {
-      const mid = (group.start + group.end) / 2;
+      const year = state.data.months[monthIndex].slice(0, 4);
       return `
-        <line class="chart-year-split" x1="${x(group.start)}" x2="${x(group.start)}" y1="${height - 63}" y2="${height - 48}" />
-        <text class="chart-x-year" x="${x(mid)}" y="${height - 16}" text-anchor="middle">${group.year}</text>
+        <text class="chart-x-year" x="${x(i)}" y="${height - 52}" text-anchor="middle">${year}</text>
+        <text class="chart-x-month" x="${x(i)}" y="${height - 34}" text-anchor="middle">${monthNames[monthNumber - 1].toUpperCase()}</text>
       `;
     })
     .join("");
@@ -1206,11 +1211,14 @@ function renderChart() {
     `)
     .join("");
 
+  const seriesLabel = chartSeriesLabel(item, state.chart.mode);
   els.chartTitle.textContent = `${displayName(item)} - ${chartModeLabel(state.chart.mode)}`;
   els.chartSubtitle.textContent = `${state.indexFamily}, full history, ${state.data.months[0]} to ${state.data.months[state.data.months.length - 1]}`;
   els.chartSvg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   els.chartSvg.innerHTML = `
     <rect class="chart-bg" x="0" y="0" width="${width}" height="${height}" />
+    <text class="chart-main-title" x="${width / 2}" y="28" text-anchor="middle">${escapeHtml(seriesLabel)}</text>
+    <text class="chart-y-title" x="${margin.left - 48}" y="${margin.top - 12}">${escapeHtml(chartModeLabel(state.chart.mode))}</text>
     ${yGrid}
     ${min < 0 && max > 0 ? `<line class="chart-zero" x1="${margin.left}" x2="${width - margin.right}" y1="${zeroY}" y2="${zeroY}" />` : ""}
     <line class="chart-axis" x1="${margin.left}" x2="${margin.left}" y1="${margin.top}" y2="${height - margin.bottom}" />
@@ -1220,7 +1228,11 @@ function renderChart() {
       .map((value, i) => Number.isFinite(value) ? `<circle class="chart-point" cx="${x(i)}" cy="${y(value)}" r="2"><title>${shortMonth(state.data.months[i])}: ${formatAxisValue(value)}</title></circle>` : "")
       .join("")}
     ${monthLabels}
-    ${yearLabels}
+    <g class="chart-legend">
+      <line x1="${width / 2 - 160}" x2="${width / 2 - 140}" y1="${height - 22}" y2="${height - 22}" />
+      <circle cx="${width / 2 - 150}" cy="${height - 22}" r="2" />
+      <text x="${width / 2 - 132}" y="${height - 18}">${escapeHtml(seriesLabel)}</text>
+    </g>
   `;
 }
 
