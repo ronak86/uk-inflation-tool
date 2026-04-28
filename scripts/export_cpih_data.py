@@ -48,6 +48,7 @@ def read_sector_defs(workbook) -> dict:
     sector_defs = {
         "CPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set()},
         "CPIH": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set()},
+        "RPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set()},
     }
 
     for row in rows[1:]:
@@ -68,15 +69,23 @@ def read_sector_defs(workbook) -> dict:
             code = clean_code(code)
             if code:
                 sector_defs["CPIH"]["servicesCodes"].add(code)
+        for code in (row[12] if len(row) > 12 else None, row[13] if len(row) > 13 else None):
+            code = clean_code(code)
+            if code:
+                sector_defs["RPI"]["servicesCodes"].add(code)
 
-        for code in (row[13] if len(row) > 13 else None, row[14] if len(row) > 14 else None):
+        for code in (row[16] if len(row) > 16 else None, row[17] if len(row) > 17 else None):
             code = clean_code(code)
             if code:
                 sector_defs["CPI"]["nonCoreCodes"].add(code)
-        for code in (row[15] if len(row) > 15 else None, row[16] if len(row) > 16 else None):
+        for code in (row[18] if len(row) > 18 else None, row[19] if len(row) > 19 else None):
             code = clean_code(code)
             if code:
                 sector_defs["CPIH"]["nonCoreCodes"].add(code)
+        for code in (row[21] if len(row) > 21 else None, row[22] if len(row) > 22 else None):
+            code = clean_code(code)
+            if code:
+                sector_defs["RPI"]["nonCoreCodes"].add(code)
 
     return sector_defs
 
@@ -178,7 +187,7 @@ def main() -> None:
     sector_defs = read_sector_defs(workbook)
     series_payloads = {
         series: read_series(workbook, series)
-        for series in ("CPIH", "CPI")
+        for series in ("CPIH", "CPI", "RPI")
     }
     for series, overall in overall_3dp.items():
         if series in series_payloads:

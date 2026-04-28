@@ -135,7 +135,7 @@ function actualHeadlineChange(monthIndex, horizon) {
 
 function priceMeasureValue(item, monthIndex) {
   if (isSectorFiltered()) {
-    if (item.level === 4) return priceChange(item, monthIndex, state.horizon);
+    if (item.level === leafLevel()) return priceChange(item, monthIndex, state.horizon);
     return aggregatePriceChange(activeLeafItemsFor(item), monthIndex, state.horizon);
   }
   return item.level === 0
@@ -162,6 +162,22 @@ function codePrefix(name) {
 
 function getAllItems() {
   return state.data.items.find((item) => item.level === 0);
+}
+
+function isRpi() {
+  return state.indexFamily === "RPI";
+}
+
+function leafLevel() {
+  return Math.max(...state.data.items.map((item) => item.level));
+}
+
+function maxSelectableLevel() {
+  return leafLevel();
+}
+
+function previousJanuaryIndex(year) {
+  return findMonthIndex(year - 1, 1);
 }
 
 function calcCacheKey() {
@@ -223,8 +239,17 @@ function setIndexFamily(indexFamily) {
   state.monthIndex = state.data.months.length - 1;
   state.sort = { type: "name", monthIndex: null };
   state.selectedRowId = null;
+  if (isRpi() && state.boeView !== "all") {
+    state.boeView = "all";
+    checkRadio('[data-boe-view="all"]');
+  }
+  if (Number(state.levelView) > maxSelectableLevel()) {
+    state.levelView = "all";
+    checkRadio('[data-level-view="all"]');
+  }
   invalidateCalcCache();
   buildHierarchy();
+  updateIndexSpecificControls();
 }
 
 function descendantsAtLevel(item, level) {
@@ -240,13 +265,14 @@ function descendantsAtLevel(item, level) {
 }
 
 function leafItemsFor(item) {
-  if (item.level === 4) return [item];
-  if (item.level === 0) return state.data.items.filter((candidate) => candidate.level === 4);
-  return descendantsAtLevel(item, 4);
+  const level = leafLevel();
+  if (item.level === level) return [item];
+  if (item.level === 0) return state.data.items.filter((candidate) => candidate.level === level);
+  return descendantsAtLevel(item, level);
 }
 
 function isSectorFiltered() {
-  return state.sectorView !== "all" || state.coreView !== "all" || state.boeView !== "all";
+  return state.sectorView !== "all" || state.coreView !== "all" || (!isRpi() && state.boeView !== "all");
 }
 
 function leafInActiveSectors(leaf) {
@@ -255,8 +281,8 @@ function leafInActiveSectors(leaf) {
   if (state.sectorView === "goods" && sectors.services) return false;
   if (state.coreView === "noncore" && !sectors.nonCore) return false;
   if (state.coreView === "core" && sectors.nonCore) return false;
-  if (state.boeView === "boe" && !sectors.boe) return false;
-  if (state.boeView === "exboe" && sectors.boe) return false;
+  if (!isRpi() && state.boeView === "boe" && !sectors.boe) return false;
+  if (!isRpi() && state.boeView === "exboe" && sectors.boe) return false;
   return true;
 }
 
@@ -264,7 +290,7 @@ function activeLeafItems() {
   const cache = ensureCalcCache();
   if (!cache.activeLeaves) {
     cache.activeLeaves = state.data.items
-      .filter((candidate) => candidate.level === 4)
+      .filter((candidate) => candidate.level === leafLevel())
       .filter(leafInActiveSectors);
   }
   return cache.activeLeaves;
@@ -301,8 +327,8 @@ function activeBasketName() {
   if (state.coreView === "noncore") parts.push("Non Core");
   if (state.sectorView === "services") parts.push("Services");
   if (state.sectorView === "goods") parts.push("Goods");
-  if (state.boeView === "boe") parts.push("BoE Measure");
-  if (state.boeView === "exboe") parts.push("ex BoE Measure");
+  if (!isRpi() && state.boeView === "boe") parts.push("BoE Measure");
+  if (!isRpi() && state.boeView === "exboe") parts.push("ex BoE Measure");
   if (parts.length === 1) return getAllItems().name;
   return `${parts.join(" ")} index`;
 }
@@ -344,9 +370,9 @@ function unchainedIndex(item, monthIndex) {
   const { year, month } = monthParts(monthIndex);
   const current = item.prices[monthIndex];
   if (month === 1) {
-    const december = findMonthIndex(year - 1, 12);
-    if (december < 0) return NaN;
-    return (current / item.prices[december]) * 100;
+    const baseIndex = isRpi() ? previousJanuaryIndex(year) : findMonthIndex(year - 1, 12);
+    if (baseIndex < 0) return NaN;
+    return (current / item.prices[baseIndex]) * 100;
   }
   const january = findMonthIndex(year, 1);
   return (current / item.prices[january]) * 100;
@@ -417,8 +443,13 @@ function monthlyLeafContribution(item, monthIndex) {
 
   if (month === 1) {
     itemCurrent = unchainedIndex(item, monthIndex);
-    itemPrevious = 100;
-    allPrevious = 100;
+    if (isRpi()) {
+      itemPrevious = unchainedFromCurrentJanuary(item, monthIndex - 1);
+      allPrevious = unchainedFromCurrentJanuary(allItems, monthIndex - 1);
+    } else {
+      itemPrevious = 100;
+      allPrevious = 100;
+    }
   } else {
     itemCurrent = unchainedFromCurrentJanuary(item, monthIndex);
     itemPrevious = unchainedFromCurrentJanuary(item, monthIndex - 1);
@@ -446,8 +477,13 @@ function monthlySubsetLeafContribution(item, monthIndex, leaves) {
 
   if (month === 1) {
     itemCurrent = unchainedIndex(item, monthIndex);
-    itemPrevious = 100;
-    subsetPrevious = 100;
+    if (isRpi()) {
+      itemPrevious = unchainedFromCurrentJanuary(item, monthIndex - 1);
+      subsetPrevious = subsetUnchainedFromCurrentJanuary(monthIndex - 1, monthIndex, leaves);
+    } else {
+      itemPrevious = 100;
+      subsetPrevious = 100;
+    }
   } else {
     itemCurrent = unchainedFromCurrentJanuary(item, monthIndex);
     itemPrevious = unchainedFromCurrentJanuary(item, monthIndex - 1);
@@ -463,6 +499,8 @@ function monthlySubsetLeafContribution(item, monthIndex, leaves) {
 }
 
 function annualLeafContribution(item, monthIndex) {
+  if (isRpi()) return annualRpiLeafContribution(item, monthIndex);
+
   const { year, month } = monthParts(monthIndex);
   if (monthIndex < 12) return NaN;
 
@@ -511,7 +549,42 @@ function annualLeafContribution(item, monthIndex) {
   return termOne + termTwo + termThree;
 }
 
+function annualRpiLeafContribution(item, monthIndex) {
+  const { year, month } = monthParts(monthIndex);
+  if (monthIndex < 12) return NaN;
+
+  const allItems = getAllItems();
+  const previousMonthIndex = findMonthIndex(year - 1, month);
+  const previousJanuary = previousJanuaryIndex(year);
+  const currentJanuary = findMonthIndex(year, 1);
+
+  if (previousMonthIndex < 0 || previousJanuary < 0 || currentJanuary < 0) return NaN;
+
+  const denom = unchainedFromCurrentJanuary(allItems, previousMonthIndex);
+  const allCurrentJanuary = unchainedIndex(allItems, currentJanuary);
+  const itemPreviousMonth = unchainedFromCurrentJanuary(item, previousMonthIndex);
+  const itemCurrentJanuary = unchainedIndex(item, currentJanuary);
+  const itemCurrentMonth =
+    month === 1 ? 100 : unchainedFromCurrentJanuary(item, monthIndex);
+
+  const previousWeight = item.weights[previousJanuary] / 1000;
+  const currentWeight = item.weights[currentJanuary] / 1000;
+
+  const termOne = previousWeight * ((itemCurrentJanuary - itemPreviousMonth) / denom) * 100;
+  const termTwo =
+    month === 1
+      ? 0
+      : currentWeight *
+        ((itemCurrentMonth - 100) / denom) *
+        (allCurrentJanuary / 100) *
+        100;
+
+  return termOne + termTwo;
+}
+
 function annualSubsetLeafContribution(item, monthIndex, leaves = activeLeafItems()) {
+  if (isRpi()) return annualRpiSubsetLeafContribution(item, monthIndex, leaves);
+
   const { year, month } = monthParts(monthIndex);
   if (monthIndex < 12) return NaN;
 
@@ -571,6 +644,49 @@ function annualSubsetLeafContribution(item, monthIndex, leaves = activeLeafItems
         subsetPreviousDecember;
 
   return termOne + termTwo + termThree;
+}
+
+function annualRpiSubsetLeafContribution(item, monthIndex, leaves = activeLeafItems()) {
+  const { year, month } = monthParts(monthIndex);
+  if (monthIndex < 12) return NaN;
+
+  const previousMonthIndex = findMonthIndex(year - 1, month);
+  const previousJanuary = previousJanuaryIndex(year);
+  const currentJanuary = findMonthIndex(year, 1);
+
+  if (previousMonthIndex < 0 || previousJanuary < 0 || currentJanuary < 0) return NaN;
+
+  const previousWeightTotal = activeWeightTotal(previousJanuary, leaves);
+  const currentWeightTotal = activeWeightTotal(currentJanuary, leaves);
+  if (
+    !Number.isFinite(previousWeightTotal) ||
+    !Number.isFinite(currentWeightTotal) ||
+    previousWeightTotal === 0 ||
+    currentWeightTotal === 0
+  ) {
+    return NaN;
+  }
+
+  const denom = subsetUnchainedFromCurrentJanuary(previousMonthIndex, previousJanuary, leaves);
+  const subsetCurrentJanuary = subsetUnchainedIndex(currentJanuary, currentJanuary, leaves);
+  const itemPreviousMonth = unchainedFromCurrentJanuary(item, previousMonthIndex);
+  const itemCurrentJanuary = unchainedIndex(item, currentJanuary);
+  const itemCurrentMonth =
+    month === 1 ? 100 : unchainedFromCurrentJanuary(item, monthIndex);
+
+  const previousWeight = item.weights[previousJanuary] / previousWeightTotal;
+  const currentWeight = item.weights[currentJanuary] / currentWeightTotal;
+
+  const termOne = previousWeight * ((itemCurrentJanuary - itemPreviousMonth) / denom) * 100;
+  const termTwo =
+    month === 1
+      ? 0
+      : currentWeight *
+        ((itemCurrentMonth - 100) / denom) *
+        (subsetCurrentJanuary / 100) *
+        100;
+
+  return termOne + termTwo;
 }
 
 function aggregatePriceChange(leaves, monthIndex, horizon) {
@@ -946,10 +1062,10 @@ function renderErrors() {
   function grid(indexFamily, horizon) {
     return withDataset(indexFamily, () => {
       const years = [...new Set(state.data.months.map((month) => month.slice(0, 4)))];
-      const title = `${indexFamily} ${horizon === "mom" ? "MoM" : "YoY"} Error, bp`;
+      const title = `${horizon === "mom" ? "MoM" : "YoY"} Error, bp`;
 
       return `
-        <section class="error-grid-card">
+        <section class="error-grid-card compact">
           <h2>${title}</h2>
           <table class="error-grid">
             <thead>
@@ -981,11 +1097,23 @@ function renderErrors() {
     });
   }
 
+  function indexGrid(indexFamily) {
+    if (!state.datasets[indexFamily]) return "";
+    return `
+      <section class="error-index-card">
+        <h2>${indexFamily}</h2>
+        <div class="error-index-grids">
+          ${grid(indexFamily, "mom")}
+          ${grid(indexFamily, "yoy")}
+        </div>
+      </section>
+    `;
+  }
+
   errorsHtmlCache = `
-    ${grid("CPI", "mom")}
-    ${grid("CPI", "yoy")}
-    ${grid("CPIH", "mom")}
-    ${grid("CPIH", "yoy")}
+    ${indexGrid("CPI")}
+    ${indexGrid("CPIH")}
+    ${indexGrid("RPI")}
   `;
   els.errorRows.innerHTML = errorsHtmlCache;
 }
@@ -1013,6 +1141,36 @@ function checkRadio(selector) {
 function applyTheme() {
   document.documentElement.dataset.theme = state.theme;
   els.themeToggle.setAttribute("aria-pressed", String(state.theme === "dark"));
+}
+
+function updateIndexSpecificControls() {
+  const isRpiSeries = isRpi();
+  const labels = isRpiSeries
+    ? {
+        1: "Level 1 (Broad Groups)",
+        2: "Level 2 (Groups)",
+        3: "Level 3 (Sections)",
+        4: "Level 4",
+      }
+    : {
+        1: "Level 1 (Divisions)",
+        2: "Level 2 (Groups)",
+        3: "Level 3 (Classes)",
+        4: "Level 4 (Sub Classes)",
+      };
+
+  Object.entries(labels).forEach(([level, label]) => {
+    document.querySelectorAll(`[data-level-label="${level}"]`).forEach((node) => {
+      node.textContent = label;
+    });
+  });
+
+  document.querySelectorAll("[data-level-option='4']").forEach((node) => {
+    node.hidden = isRpiSeries;
+  });
+  document.querySelectorAll("[data-boe-control]").forEach((node) => {
+    node.hidden = isRpiSeries;
+  });
 }
 
 function selectExplorerTable() {

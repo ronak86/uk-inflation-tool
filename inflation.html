@@ -17,7 +17,7 @@
     <meta name="twitter:image" content="https://chitroda.com/web/assets/inflation-preview.png" />
     <link rel="icon" href="web/assets/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="web/assets/favicon.png" type="image/png" />
-    <link rel="stylesheet" href="web/styles.css?v=tree-word-controls" />
+    <link rel="stylesheet" href="web/styles.css?v=rpi-local" />
   </head>
   <body>
     <main class="app">
@@ -64,6 +64,7 @@
             <div class="radio-row" role="radiogroup" aria-label="Index family">
               <label><input type="radio" name="indexFamily" value="CPI" data-index-family="CPI" checked /> <span>CPI</span></label>
               <label><input type="radio" name="indexFamily" value="CPIH" data-index-family="CPIH" /> <span>CPIH</span></label>
+              <label><input type="radio" name="indexFamily" value="RPI" data-index-family="RPI" /> <span>RPI</span></label>
             </div>
           </div>
 
@@ -93,7 +94,7 @@
             </div>
           </div>
 
-          <div class="control-group">
+          <div class="control-group" data-boe-control>
             <span class="label">BoE</span>
             <div class="radio-row vertical" role="radiogroup" aria-label="Bank of England measure">
               <label><input type="radio" name="boeView" value="all" data-boe-view="all" checked /> <span>All</span></label>
@@ -115,10 +116,10 @@
             <span class="label">Level</span>
             <div class="radio-row level-grid" role="radiogroup" aria-label="Basket level">
               <label><input type="radio" name="levelView" value="all" data-level-view="all" checked /> <span>All</span></label>
-              <label><input type="radio" name="levelView" value="1" data-level-view="1" /> <span>Level 1 (Divisions)</span></label>
-              <label><input type="radio" name="levelView" value="2" data-level-view="2" /> <span>Level 2 (Groups)</span></label>
-              <label><input type="radio" name="levelView" value="3" data-level-view="3" /> <span>Level 3 (Classes)</span></label>
-              <label><input type="radio" name="levelView" value="4" data-level-view="4" /> <span>Level 4 (Sub Classes)</span></label>
+              <label><input type="radio" name="levelView" value="1" data-level-view="1" /> <span data-level-label="1">Level 1 (Divisions)</span></label>
+              <label><input type="radio" name="levelView" value="2" data-level-view="2" /> <span data-level-label="2">Level 2 (Groups)</span></label>
+              <label><input type="radio" name="levelView" value="3" data-level-view="3" /> <span data-level-label="3">Level 3 (Classes)</span></label>
+              <label data-level-option="4"><input type="radio" name="levelView" value="4" data-level-view="4" /> <span data-level-label="4">Level 4 (Sub Classes)</span></label>
             </div>
           </div>
 
@@ -160,7 +161,7 @@
                 <div>
                   <h3>Inflation Views</h3>
                   <ul>
-                    <li>CPI and CPIH</li>
+                    <li>CPI, CPIH and RPI</li>
                     <li>Month-on-month and year-on-year views</li>
                     <li>Weights, price changes, and contribution estimates</li>
                     <li>Full basket drill-down from headline to item level</li>
@@ -171,7 +172,7 @@
                   <ul>
                     <li>Services vs goods</li>
                     <li>Core vs non-core</li>
-                    <li>BoE measure and ex-BoE views</li>
+                    <li>BoE measure and ex-BoE views for CPI and CPIH</li>
                     <li>Reconstructed sub-index price changes</li>
                   </ul>
                 </div>
@@ -188,7 +189,7 @@
                   <h3>Checks</h3>
                   <ul>
                     <li>Error checks against headline inflation</li>
-                    <li>CPI and CPIH MoM and YoY error grids</li>
+                    <li>CPI, CPIH and RPI MoM and YoY error grids</li>
                     <li>Errors shown in basis points</li>
                     <li>Best used on desktop</li>
                   </ul>
@@ -199,7 +200,7 @@
 
           <section class="panel" id="errorsPanel">
             <div class="error-note">
-              The errors tab compares the calculated sum of Level 4 contributions with the headline inflation rate derived from the published overall index. Small differences arise because the public weights and index values are rounded, so component-level calculations will not always add exactly to the official headline rate.
+              The errors tab compares the calculated sum of the most detailed component contributions with the headline inflation rate derived from the published overall index. Small differences arise because the public weights and index values are rounded, so component-level calculations will not always add exactly to the official headline rate.
             </div>
             <div class="error-grids" id="errorRows"></div>
           </section>
@@ -207,8 +208,8 @@
       </section>
     </main>
 
-    <script src="web/data/cpih-data.js?v=tree-word-controls"></script>
-    <script src="web/app.js?v=tree-word-controls"></script>
+    <script src="web/data/cpih-data.js?v=rpi-local"></script>
+    <script src="web/app.js?v=rpi-local"></script>
     <!-- Cloudflare Web Analytics -->
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "4377e92dc4aa4a8abcc0578fdf2fa15f"}'></script>
     <!-- End Cloudflare Web Analytics -->
