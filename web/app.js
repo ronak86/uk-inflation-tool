@@ -315,6 +315,7 @@ function buildHierarchy() {
 function setIndexFamily(indexFamily) {
   state.indexFamily = indexFamily;
   state.data = state.datasets[indexFamily];
+  syncIndexFamilyInput();
   state.monthIndex = state.data.months.length - 1;
   state.sort = { type: "name", monthIndex: null };
   state.selectedRowId = null;
@@ -1191,28 +1192,54 @@ function hideChartTooltip() {
 
 function showChartContextMenu(event, item) {
   if (!els.chartContextMenu) return;
+  if (state.measure === "contribution") {
+    hideChartContextMenu();
+    return;
+  }
   state.contextRowId = item.id;
   const options =
     state.measure === "weight"
-      ? [{ mode: "weight", label: "Weight change over time" }]
-      : state.measure === "price"
-      ? [
-          { mode: "price-change", label: "Price Change %" },
-          { mode: "price-index", label: "Index (Rebased to Jan 2015)" },
-        ]
+      ? [{ mode: "weight", label: "Weight over time", icon: "W" }]
       : [
-          { mode: "contribution", label: "Non cumulative" },
-          { mode: "contribution-cumulative", label: "Cumulative" },
+          { mode: "price-change", label: "Price change, %", icon: "%" },
+          { mode: "price-index", label: "Index, Jan 2015 = 100", icon: "I" },
         ];
 
-  els.chartContextMenu.innerHTML = options
-    .map(
-      (option, index) =>
-        `${index === 0 ? `<div class="context-menu-title">Plot Chart</div>` : ""}<button type="button" data-chart-mode="${option.mode}">${escapeHtml(option.label)}</button>`,
-    )
-    .join("");
-  els.chartContextMenu.style.left = `${event.clientX}px`;
-  els.chartContextMenu.style.top = `${event.clientY}px`;
+  els.chartContextMenu.innerHTML = `
+    <div class="context-menu-title">
+      <span class="context-menu-title-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" focusable="false">
+          <path d="M3 15.5h14" />
+          <path d="M4 13l3.2-3.4 3 2.1L16 5" />
+          <circle cx="4" cy="13" r="1.2" />
+          <circle cx="7.2" cy="9.6" r="1.2" />
+          <circle cx="10.2" cy="11.7" r="1.2" />
+          <circle cx="16" cy="5" r="1.2" />
+        </svg>
+      </span>
+      <span>
+        <strong>Plot Chart</strong>
+        <small>${escapeHtml(displayName(item))}</small>
+      </span>
+    </div>
+    <div class="context-menu-separator"></div>
+    ${options
+      .map(
+        (option) => `
+          <button type="button" data-chart-mode="${option.mode}">
+            <span class="context-menu-option-icon" aria-hidden="true">${escapeHtml(option.icon)}</span>
+            <span>${escapeHtml(option.label)}</span>
+          </button>
+        `,
+      )
+      .join("")}
+  `;
+  const menuWidth = 284;
+  const menuHeight = 58 + options.length * 38;
+  const left = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+  const top = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+  els.chartContextMenu.style.left = `${Math.max(8, left)}px`;
+  els.chartContextMenu.style.top = `${Math.max(8, top)}px`;
   els.chartContextMenu.hidden = false;
 }
 
@@ -1434,6 +1461,10 @@ function setActiveButtons(selector, value, attr) {
 function checkRadio(selector) {
   const input = document.querySelector(selector);
   if (input) input.checked = true;
+}
+
+function syncIndexFamilyInput() {
+  checkRadio(`[data-index-family="${state.indexFamily}"]`);
 }
 
 function applyTheme() {
@@ -1756,11 +1787,7 @@ async function init() {
     restoreControlsWidth();
     state.datasets = normalizePayload(await loadData());
     const indexParam = new URLSearchParams(window.location.search).get("index")?.toUpperCase();
-    if (indexParam && state.datasets[indexParam]) {
-      state.indexFamily = indexParam;
-      const indexInput = document.querySelector(`[data-index-family="${indexParam}"]`);
-      if (indexInput) indexInput.checked = true;
-    }
+    state.indexFamily = indexParam && state.datasets[indexParam] ? indexParam : "CPI";
     setIndexFamily(state.indexFamily);
     const rangeParam = new URLSearchParams(window.location.search).get("range");
     if (["1", "2", "5", "10", "all"].includes(rangeParam)) {
