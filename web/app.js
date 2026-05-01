@@ -356,7 +356,7 @@ function leafItemsFor(item) {
 }
 
 function isSectorFiltered() {
-  return state.sectorView !== "all" || state.coreView !== "all" || (!isRpi() && state.boeView !== "none");
+  return state.sectorView !== "all" || state.coreView !== "all" || (!isRpi() && state.boeView !== "all");
 }
 
 function leafInActiveSectors(leaf) {
@@ -366,7 +366,6 @@ function leafInActiveSectors(leaf) {
   if (state.sectorView === "housing" && !sectors.housing) return false;
   if (state.coreView === "noncore" && !sectors.nonCore) return false;
   if (state.coreView === "core" && sectors.nonCore) return false;
-  if (!isRpi() && state.boeView === "all" && !(sectors.boe || sectors.exBoe)) return false;
   if (!isRpi() && state.boeView === "boe" && !sectors.boe) return false;
   if (!isRpi() && state.boeView === "exboe" && !sectors.exBoe) return false;
   return true;
@@ -414,7 +413,6 @@ function activeBasketName() {
   if (state.sectorView === "services") parts.push("Services");
   if (state.sectorView === "goods") parts.push("Goods");
   if (state.sectorView === "housing") parts.push("Housing");
-  if (!isRpi() && state.boeView === "all") parts.push("BoE Services");
   if (!isRpi() && state.boeView === "boe") parts.push("BoE Services");
   if (!isRpi() && state.boeView === "exboe") parts.push("ex BoE Services");
   if (parts.length === 1) return getAllItems().name;
