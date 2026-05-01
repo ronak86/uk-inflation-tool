@@ -1122,14 +1122,14 @@ function renderDefinitions() {
     .map(
       (item) => `
         <tr>
-          <td>${escapeHtml(item.name)}</td>
-          <td><span class="level-pill">L${item.level}</span></td>
-          <td class="code-cell">${codeLinkHtml(item.weightCode)}</td>
-          <td class="code-cell">${codeLinkHtml(item.priceCode)}</td>
-          <td>${sectorDefinitionLabel(item)}</td>
-          <td>${coreDefinitionLabel(item)}</td>
-          ${showBoeColumn ? `<td>${boeDefinitionLabel(item)}</td>` : ""}
-          <td class="number">${formatWeight(item.weights[latestMonthIndex])}</td>
+          <td class="definition-name-cell">${escapeHtml(item.name)}</td>
+          <td class="definition-center-cell"><span class="level-pill">L${item.level}</span></td>
+          <td class="definition-center-cell code-cell">${codeLinkHtml(item.weightCode)}</td>
+          <td class="definition-center-cell code-cell">${codeLinkHtml(item.priceCode)}</td>
+          <td class="definition-center-cell">${sectorDefinitionLabel(item)}</td>
+          <td class="definition-center-cell">${coreDefinitionLabel(item)}</td>
+          ${showBoeColumn ? `<td class="definition-center-cell">${boeDefinitionLabel(item)}</td>` : ""}
+          <td class="definition-number-cell">${formatWeight(item.weights[latestMonthIndex])}</td>
         </tr>
       `,
     )

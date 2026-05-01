@@ -1060,7 +1060,7 @@ body.resizing-controls {
 .definitions-table td {
   border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   overflow: hidden;
-  padding: 4px 7px;
+  padding: 4px 6px;
   text-overflow: ellipsis;
   vertical-align: middle;
   white-space: nowrap;
@@ -1079,19 +1079,6 @@ body.resizing-controls {
   z-index: 1;
 }
 
-.definitions-table th[data-definition-col="level"],
-.definitions-table th[data-definition-col="weightCode"],
-.definitions-table th[data-definition-col="priceCode"],
-.definitions-table th[data-definition-col="sector"],
-.definitions-table th[data-definition-col="core"],
-.definitions-table th[data-definition-col="boe"] {
-  text-align: center;
-}
-
-.definitions-table th[data-definition-col="latestWeight"] {
-  text-align: right;
-}
-
 .definitions-table tbody tr:nth-child(odd) {
   background: var(--excel-light);
 }
@@ -1100,13 +1087,19 @@ body.resizing-controls {
   background: var(--excel-faint);
 }
 
-.definitions-table td:nth-child(2),
-.definitions-table td:nth-child(3),
-.definitions-table td:nth-child(4),
-.definitions-table td:nth-child(5),
-.definitions-table td:nth-child(6),
-.definitions-table td:nth-child(7) {
+.definitions-table th:not([data-definition-col="name"]),
+.definition-center-cell {
   text-align: center;
+}
+
+.definitions-table th[data-definition-col="name"],
+.definition-name-cell {
+  text-align: left;
+}
+
+.definitions-table th[data-definition-col="latestWeight"],
+.definition-number-cell {
+  text-align: right;
 }
 
 .definitions-table td:last-child {
