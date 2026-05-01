@@ -1298,14 +1298,16 @@ tbody tr.level-0 {
 }
 
 tbody tr.level-0 td {
+  background: var(--row-0);
   border-bottom: 1px solid #ffffff;
   position: sticky;
   top: 22px;
-  z-index: 3;
+  z-index: 6;
 }
 
 tbody tr.level-0 td.sticky-name {
-  z-index: 5;
+  background: var(--row-0);
+  z-index: 7;
 }
 
 tbody tr.level-0 .measure-label {
