@@ -1299,6 +1299,13 @@ tbody tr.level-0 {
 
 tbody tr.level-0 td {
   border-bottom: 1px solid #ffffff;
+  position: sticky;
+  top: 22px;
+  z-index: 3;
+}
+
+tbody tr.level-0 td.sticky-name {
+  z-index: 5;
 }
 
 tbody tr.level-0 .measure-label {
