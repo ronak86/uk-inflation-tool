@@ -35,6 +35,10 @@ const els = {
   chartClose: document.querySelector("#chartClose"),
   chartContextMenu: document.querySelector("#chartContextMenu"),
   chartTooltip: document.querySelector("#chartTooltip"),
+  definitionsPanel: document.querySelector("#definitionsPanel"),
+  definitionsHead: document.querySelector("#definitionsHead"),
+  definitionsRows: document.querySelector("#definitionsRows"),
+  definitionsSummary: document.querySelector("#definitionsSummary"),
   featuresPanel: document.querySelector("#featuresPanel"),
   errorsPanel: document.querySelector("#errorsPanel"),
   themeToggle: document.querySelector("#themeToggle"),
@@ -429,6 +433,24 @@ function displayWeightCode(item) {
 
 function displayPriceCode(item) {
   return item.level === 0 && isSectorFiltered() ? "" : item.priceCode;
+}
+
+function sectorDefinitionLabel(item) {
+  const sectors = item.sectors || {};
+  if (sectors.housing) return "Housing";
+  if (sectors.services) return "Services";
+  return "Goods";
+}
+
+function coreDefinitionLabel(item) {
+  return item.sectors?.nonCore ? "Non Core" : "Core";
+}
+
+function boeDefinitionLabel(item) {
+  if (isRpi()) return "";
+  if (item.sectors?.boe) return "BoE Services";
+  if (item.sectors?.exBoe) return "ex BoE Services";
+  return "";
 }
 
 function onsSeriesUrl(code) {
@@ -1041,6 +1063,51 @@ function renderExplorer() {
   els.itemRows.innerHTML = rows;
 }
 
+function renderDefinitions() {
+  const leafLevelValue = leafLevel();
+  const latestMonthIndex = state.data.months.length - 1;
+  const rows = state.data.items
+    .filter((item) => item.level === leafLevelValue)
+    .filter(leafInActiveSectors)
+    .sort((a, b) => sortLabel(a).localeCompare(sortLabel(b), "en-GB", { numeric: true }));
+  const showBoeColumn = !isRpi();
+  const filterParts = [];
+  if (state.sectorView !== "all") filterParts.push(state.sectorView === "housing" ? "Housing" : state.sectorView === "services" ? "Services" : "Goods");
+  if (state.coreView !== "all") filterParts.push(state.coreView === "noncore" ? "Non Core" : "Core");
+  if (showBoeColumn && state.boeView !== "all") filterParts.push(state.boeView === "boe" ? "BoE Services" : "All exc BoE Services");
+  const filterLabel = filterParts.length ? filterParts.join(", ") : "All definitions";
+
+  els.definitionsSummary.textContent = `${state.indexFamily}: ${rows.length} leaf definitions shown for ${filterLabel}.`;
+  els.definitionsHead.innerHTML = `
+    <tr>
+      <th>Name</th>
+      <th>Level</th>
+      <th>Weight Code</th>
+      <th>Price Code</th>
+      <th>Sector</th>
+      <th>Core</th>
+      ${showBoeColumn ? "<th>BoE Services</th>" : ""}
+      <th>Latest Weight, %</th>
+    </tr>
+  `;
+  els.definitionsRows.innerHTML = rows
+    .map(
+      (item) => `
+        <tr>
+          <td>${escapeHtml(item.name)}</td>
+          <td><span class="level-pill">L${item.level}</span></td>
+          <td class="code-cell">${codeLinkHtml(item.weightCode)}</td>
+          <td class="code-cell">${codeLinkHtml(item.priceCode)}</td>
+          <td>${sectorDefinitionLabel(item)}</td>
+          <td>${coreDefinitionLabel(item)}</td>
+          ${showBoeColumn ? `<td>${boeDefinitionLabel(item)}</td>` : ""}
+          <td class="number">${formatWeight(item.weights[latestMonthIndex])}</td>
+        </tr>
+      `,
+    )
+    .join("");
+}
+
 function copyValue(item, monthIndex) {
   if (state.measure === "weight") return formatWeightForCopy(weightMeasureValue(item, monthIndex));
   if (state.measure === "price") return formatNumber(priceMeasureValue(item, monthIndex), 6);
@@ -1153,6 +1220,7 @@ function setActiveTab(tab) {
   setActiveButtons("[data-tab]", state.activeTab, "tab");
   els.explorerPanel.classList.toggle("active", state.activeTab === "explorer");
   els.chartPanel?.classList.toggle("active", state.activeTab === "chart");
+  els.definitionsPanel?.classList.toggle("active", state.activeTab === "definitions");
   els.featuresPanel.classList.toggle("active", state.activeTab === "features");
   els.errorsPanel.classList.toggle("active", state.activeTab === "errors");
   render();
@@ -1451,6 +1519,8 @@ function render() {
   renderSummary();
   if (state.activeTab === "explorer") {
     renderExplorer();
+  } else if (state.activeTab === "definitions") {
+    renderDefinitions();
   } else if (state.activeTab === "chart") {
     renderChart();
   } else if (state.activeTab === "errors") {

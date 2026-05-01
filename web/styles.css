@@ -1011,6 +1011,110 @@ body.resizing-controls {
   padding: 14px 16px;
 }
 
+.definitions-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  margin-top: 0;
+  overflow: hidden;
+}
+
+.definitions-head {
+  align-items: end;
+  background: var(--excel-dark);
+  border-bottom: 1px solid #ffffff;
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+}
+
+.definitions-head h2 {
+  font-size: 14px;
+  line-height: 1;
+  margin: 0 0 4px;
+}
+
+.definitions-head p {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 11px;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.definitions-table-shell {
+  max-height: calc(100vh - 86px);
+  overflow: auto;
+}
+
+.definitions-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.definitions-table th,
+.definitions-table td {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  overflow: hidden;
+  padding: 4px 7px;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.definitions-table th {
+  background: var(--excel-dark);
+  border-bottom-color: #ffffff;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  position: sticky;
+  text-align: left;
+  top: 0;
+  z-index: 1;
+}
+
+.definitions-table tbody tr:nth-child(odd) {
+  background: var(--excel-light);
+}
+
+.definitions-table tbody tr:nth-child(even) {
+  background: var(--excel-faint);
+}
+
+.definitions-table th:nth-child(1),
+.definitions-table td:nth-child(1) {
+  width: 36%;
+}
+
+.definitions-table th:nth-child(2),
+.definitions-table td:nth-child(2),
+.definitions-table th:nth-child(3),
+.definitions-table td:nth-child(3),
+.definitions-table th:nth-child(4),
+.definitions-table td:nth-child(4) {
+  text-align: center;
+  width: 92px;
+}
+
+.definitions-table th:last-child,
+.definitions-table td:last-child {
+  text-align: right;
+  width: 110px;
+}
+
+:root[data-theme="dark"] .definitions-table tbody tr:nth-child(odd) {
+  background: #16364b;
+}
+
+:root[data-theme="dark"] .definitions-table tbody tr:nth-child(even) {
+  background: #102b3c;
+}
+
 .features-card h2 {
   color: var(--excel-dark);
   font-size: 18px;

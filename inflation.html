@@ -132,6 +132,7 @@
           <div class="content-top">
             <nav class="tabs chrome-tabs content-tabs" aria-label="Views">
               <button class="active" data-tab="explorer">Explorer</button>
+              <button data-tab="definitions">Definitions</button>
               <button data-tab="chart" id="chartTab" hidden>Chart</button>
               <button data-tab="features">Features</button>
               <button data-tab="errors">Errors</button>
@@ -162,6 +163,23 @@
                 <button type="button" id="chartClose" aria-label="Close chart">Close</button>
               </div>
               <svg id="chartSvg" class="chart-svg" role="img" aria-labelledby="chartTitle"></svg>
+            </div>
+          </section>
+
+          <section class="panel" id="definitionsPanel">
+            <div class="definitions-card">
+              <div class="definitions-head">
+                <div>
+                  <h2>Sector Definitions</h2>
+                  <p id="definitionsSummary"></p>
+                </div>
+              </div>
+              <div class="definitions-table-shell">
+                <table class="definitions-table">
+                  <thead id="definitionsHead"></thead>
+                  <tbody id="definitionsRows"></tbody>
+                </table>
+              </div>
             </div>
           </section>
 
@@ -228,8 +246,8 @@
     <div class="context-menu" id="chartContextMenu" hidden></div>
     <div class="chart-tooltip" id="chartTooltip" hidden></div>
 
-    <script src="web/data/cpih-data.js?v=boe-all-neutral-1"></script>
-    <script src="web/app.js?v=boe-all-neutral-1"></script>
+    <script src="web/data/cpih-data.js?v=definitions-tab-1"></script>
+    <script src="web/app.js?v=definitions-tab-1"></script>
     <!-- Cloudflare Web Analytics -->
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "4377e92dc4aa4a8abcc0578fdf2fa15f"}'></script>
     <!-- End Cloudflare Web Analytics -->
