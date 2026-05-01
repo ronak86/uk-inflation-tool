@@ -16,9 +16,9 @@ if not exist "Weights And Prices.xlsx" (
 echo Updating UK Inflation app data from "Weights And Prices.xlsx"...
 echo.
 echo This rebuilds:
-echo   - CPI and CPIH weights/prices
+echo   - CPI, CPIH and RPI weights/prices
 echo   - 3dp headline overall indices
-echo   - SectorDefs flags: Services, Non Core, BoE Measure
+echo   - Definitions flags: Services, Goods, RPI Housing, Non Core, BoE Measure
 echo   - web\data\cpih.json
 echo   - web\data\cpih-data.js
 echo.

@@ -40,15 +40,12 @@ def item_prefix(name):
     return str(name).strip().split(" ", 1)[0]
 
 
-def read_sector_defs(workbook) -> dict:
-    if "SectorDefs" not in workbook.sheetnames:
-        return {}
-
+def read_legacy_sector_defs(workbook) -> dict:
     rows = list(workbook["SectorDefs"].iter_rows(values_only=True))
     sector_defs = {
         "CPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set()},
         "CPIH": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set()},
-        "RPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set()},
+        "RPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
     }
 
     for row in rows[1:]:
@@ -90,11 +87,61 @@ def read_sector_defs(workbook) -> dict:
     return sector_defs
 
 
+def read_definitions(workbook) -> dict:
+    rows = list(workbook["Definitions"].iter_rows(values_only=True))
+    sector_defs = {
+        "CPIH": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
+        "CPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
+        "RPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
+    }
+    blocks = {
+        "CPIH": {"weight": 1, "price": 2, "sector": 3, "core": 4, "boe": 5},
+        "CPI": {"weight": 9, "price": 10, "sector": 11, "core": 12, "boe": 13},
+        "RPI": {"weight": 16, "price": 17, "sector": 18, "core": 19, "boe": None},
+    }
+
+    for row in rows[1:]:
+        for series, columns in blocks.items():
+            codes = (
+                row[columns["weight"]] if len(row) > columns["weight"] else None,
+                row[columns["price"]] if len(row) > columns["price"] else None,
+            )
+            clean_codes = [code for code in (clean_code(value) for value in codes) if code]
+            if not clean_codes:
+                continue
+
+            sector = clean(row[columns["sector"]] if len(row) > columns["sector"] else None)
+            core = clean(row[columns["core"]] if len(row) > columns["core"] else None)
+            boe = clean(row[columns["boe"]] if columns["boe"] is not None and len(row) > columns["boe"] else None)
+
+            if sector == "Services":
+                sector_defs[series]["servicesCodes"].update(clean_codes)
+            elif sector == "Housing":
+                sector_defs[series]["housingCodes"].update(clean_codes)
+
+            if core == "Non Core":
+                sector_defs[series]["nonCoreCodes"].update(clean_codes)
+
+            if boe == "BoE Custom Services":
+                sector_defs[series]["boeCodes"].update(clean_codes)
+
+    return sector_defs
+
+
+def read_sector_defs(workbook) -> dict:
+    if "Definitions" in workbook.sheetnames:
+        return read_definitions(workbook)
+    if "SectorDefs" in workbook.sheetnames:
+        return read_legacy_sector_defs(workbook)
+    return {}
+
+
 def annotate_sectors(payload: dict, sector_defs: dict) -> None:
     series_defs = sector_defs.get(payload["series"], {})
     boe_codes = series_defs.get("boeCodes", set())
     services_codes = series_defs.get("servicesCodes", set())
     non_core_codes = series_defs.get("nonCoreCodes", set())
+    housing_codes = series_defs.get("housingCodes", set())
 
     for item in payload["items"]:
         codes = {clean_code(item["weightCode"]), clean_code(item["priceCode"])}
@@ -103,6 +150,7 @@ def annotate_sectors(payload: dict, sector_defs: dict) -> None:
             "boe": bool(codes & boe_codes),
             "services": bool(codes & services_codes),
             "nonCore": bool(codes & non_core_codes),
+            "housing": bool(codes & housing_codes),
         }
 
 

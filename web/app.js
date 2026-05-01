@@ -323,6 +323,10 @@ function setIndexFamily(indexFamily) {
     state.boeView = "all";
     checkRadio('[data-boe-view="all"]');
   }
+  if (!isRpi() && state.sectorView === "housing") {
+    state.sectorView = "all";
+    checkRadio('[data-sector-view="all"]');
+  }
   if (Number(state.levelView) > maxSelectableLevel()) {
     state.levelView = "all";
     checkRadio('[data-level-view="all"]');
@@ -358,7 +362,8 @@ function isSectorFiltered() {
 function leafInActiveSectors(leaf) {
   const sectors = leaf.sectors || {};
   if (state.sectorView === "services" && !sectors.services) return false;
-  if (state.sectorView === "goods" && sectors.services) return false;
+  if (state.sectorView === "goods" && (sectors.services || sectors.housing)) return false;
+  if (state.sectorView === "housing" && !sectors.housing) return false;
   if (state.coreView === "noncore" && !sectors.nonCore) return false;
   if (state.coreView === "core" && sectors.nonCore) return false;
   if (!isRpi() && state.boeView === "boe" && !sectors.boe) return false;
@@ -407,6 +412,7 @@ function activeBasketName() {
   if (state.coreView === "noncore") parts.push("Non Core");
   if (state.sectorView === "services") parts.push("Services");
   if (state.sectorView === "goods") parts.push("Goods");
+  if (state.sectorView === "housing") parts.push("Housing");
   if (!isRpi() && state.boeView === "boe") parts.push("BoE Measure");
   if (!isRpi() && state.boeView === "exboe") parts.push("ex BoE Measure");
   if (parts.length === 1) return getAllItems().name;
@@ -1499,6 +1505,9 @@ function updateIndexSpecificControls() {
   });
   document.querySelectorAll("[data-boe-control]").forEach((node) => {
     node.hidden = isRpiSeries;
+  });
+  document.querySelectorAll("[data-sector-option='housing']").forEach((node) => {
+    node.hidden = !isRpiSeries;
   });
 }
 
