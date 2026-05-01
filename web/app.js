@@ -49,16 +49,6 @@ const els = {
 const controlsWidthStorageKey = "ukInflationControlsWidth";
 const controlsWidthMin = 150;
 const controlsWidthMax = 340;
-const definitionColumnDefaultWidths = {
-  name: 430,
-  level: 86,
-  weightCode: 118,
-  priceCode: 118,
-  sector: 126,
-  core: 126,
-  boe: 150,
-  latestWeight: 130,
-};
 
 const calcCache = {
   key: "",
@@ -1099,13 +1089,15 @@ function renderDefinitions() {
   if (showBoeColumn && state.boeView !== "all") filterParts.push(state.boeView === "boe" ? "BoE Services" : "All exc BoE Services");
   const filterLabel = filterParts.length ? filterParts.join(", ") : "All definitions";
   const columnKeys = definitionColumnKeys(showBoeColumn);
-  const tableWidth = columnKeys.reduce((sum, key) => sum + definitionColumnDefaultWidths[key], 0);
+  const columnWidths = showBoeColumn
+    ? { name: 31, level: 6, weightCode: 10, priceCode: 10, sector: 10, core: 10, boe: 12, latestWeight: 11 }
+    : { name: 36, level: 7, weightCode: 12, priceCode: 12, sector: 12, core: 11, latestWeight: 10 };
 
   els.definitionsSummary.textContent = `${state.indexFamily}: ${rows.length} leaf definitions shown for ${filterLabel}.`;
   els.definitionsCols.innerHTML = columnKeys
-    .map((key) => `<col data-definition-col="${key}" style="width:${definitionColumnDefaultWidths[key]}px" />`)
+    .map((key) => `<col data-definition-col="${key}" style="width:${columnWidths[key]}%" />`)
     .join("");
-  els.definitionsRows.closest("table").style.width = `${tableWidth}px`;
+  els.definitionsRows.closest("table").style.width = "100%";
   els.definitionsHead.innerHTML = `
     <tr>
       ${definitionHeaderHtml("Name", "name")}

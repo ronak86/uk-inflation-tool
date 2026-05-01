@@ -1045,7 +1045,8 @@ body.resizing-controls {
 
 .definitions-table-shell {
   max-height: calc(100vh - 86px);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .definitions-table {
@@ -1053,7 +1054,7 @@ body.resizing-controls {
   border-spacing: 0;
   font-size: 12px;
   table-layout: fixed;
-  min-width: 100%;
+  width: 100%;
 }
 
 .definitions-table th,
