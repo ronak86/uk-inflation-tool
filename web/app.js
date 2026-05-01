@@ -36,6 +36,7 @@ const els = {
   chartContextMenu: document.querySelector("#chartContextMenu"),
   chartTooltip: document.querySelector("#chartTooltip"),
   definitionsPanel: document.querySelector("#definitionsPanel"),
+  definitionsCols: document.querySelector("#definitionsCols"),
   definitionsHead: document.querySelector("#definitionsHead"),
   definitionsRows: document.querySelector("#definitionsRows"),
   definitionsSummary: document.querySelector("#definitionsSummary"),
@@ -48,6 +49,20 @@ const els = {
 const controlsWidthStorageKey = "ukInflationControlsWidth";
 const controlsWidthMin = 150;
 const controlsWidthMax = 340;
+const definitionColumnStorageKey = "ukInflationDefinitionColumnWidths";
+const definitionColumnMinWidth = 72;
+const definitionColumnMaxWidth = 560;
+const definitionColumnDefaultWidths = {
+  name: 420,
+  level: 128,
+  weightCode: 128,
+  priceCode: 128,
+  sector: 128,
+  core: 128,
+  boe: 128,
+  latestWeight: 128,
+};
+let definitionColumnWidths = { ...definitionColumnDefaultWidths };
 
 const calcCache = {
   key: "",
@@ -451,6 +466,50 @@ function boeDefinitionLabel(item) {
   if (item.sectors?.boe) return "BoE Services";
   if (item.sectors?.exBoe) return "ex BoE Services";
   return "";
+}
+
+function definitionColumnKeys(showBoeColumn) {
+  const keys = ["name", "level", "weightCode", "priceCode", "sector", "core"];
+  if (showBoeColumn) keys.push("boe");
+  keys.push("latestWeight");
+  return keys;
+}
+
+function definitionHeaderHtml(label, key) {
+  return `
+    <th data-definition-col="${key}">
+      <span class="definition-th-inner">
+        <span>${label}</span>
+        <span class="definition-resizer" data-definition-resizer="${key}" aria-hidden="true"></span>
+      </span>
+    </th>
+  `;
+}
+
+function setDefinitionColumnWidth(key, width) {
+  const clamped = Math.max(definitionColumnMinWidth, Math.min(definitionColumnMaxWidth, width));
+  definitionColumnWidths = { ...definitionColumnWidths, [key]: clamped };
+}
+
+function persistDefinitionColumnWidths() {
+  try {
+    localStorage.setItem(definitionColumnStorageKey, JSON.stringify(definitionColumnWidths));
+  } catch {
+    // Local storage may be unavailable in some embedded browser contexts.
+  }
+}
+
+function restoreDefinitionColumnWidths() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(definitionColumnStorageKey) || "{}");
+    if (!stored || typeof stored !== "object") return;
+    Object.keys(definitionColumnDefaultWidths).forEach((key) => {
+      const value = Number(stored[key]);
+      if (Number.isFinite(value)) setDefinitionColumnWidth(key, value);
+    });
+  } catch {
+    return;
+  }
 }
 
 function onsSeriesUrl(code) {
@@ -1076,18 +1135,24 @@ function renderDefinitions() {
   if (state.coreView !== "all") filterParts.push(state.coreView === "noncore" ? "Non Core" : "Core");
   if (showBoeColumn && state.boeView !== "all") filterParts.push(state.boeView === "boe" ? "BoE Services" : "All exc BoE Services");
   const filterLabel = filterParts.length ? filterParts.join(", ") : "All definitions";
+  const columnKeys = definitionColumnKeys(showBoeColumn);
+  const tableWidth = columnKeys.reduce((sum, key) => sum + definitionColumnWidths[key], 0);
 
   els.definitionsSummary.textContent = `${state.indexFamily}: ${rows.length} leaf definitions shown for ${filterLabel}.`;
+  els.definitionsCols.innerHTML = columnKeys
+    .map((key) => `<col data-definition-col="${key}" style="width:${definitionColumnWidths[key]}px" />`)
+    .join("");
+  els.definitionsRows.closest("table").style.width = `${tableWidth}px`;
   els.definitionsHead.innerHTML = `
     <tr>
-      <th>Name</th>
-      <th>Level</th>
-      <th>Weight Code</th>
-      <th>Price Code</th>
-      <th>Sector</th>
-      <th>Core</th>
-      ${showBoeColumn ? "<th>BoE Services</th>" : ""}
-      <th>Latest Weight, %</th>
+      ${definitionHeaderHtml("Name", "name")}
+      ${definitionHeaderHtml("Level", "level")}
+      ${definitionHeaderHtml("Weight Code", "weightCode")}
+      ${definitionHeaderHtml("Price Code", "priceCode")}
+      ${definitionHeaderHtml("Sector", "sector")}
+      ${definitionHeaderHtml("Core", "core")}
+      ${showBoeColumn ? definitionHeaderHtml("BoE Services", "boe") : ""}
+      ${definitionHeaderHtml("Latest Weight, %", "latestWeight")}
     </tr>
   `;
   els.definitionsRows.innerHTML = rows
@@ -1655,6 +1720,38 @@ function bindPanelResizer() {
   });
 }
 
+function bindDefinitionColumnResizers() {
+  let activeKey = "";
+  let startX = 0;
+  let startWidth = 0;
+
+  const onMove = (event) => {
+    if (!activeKey) return;
+    setDefinitionColumnWidth(activeKey, startWidth + event.clientX - startX);
+    if (state.activeTab === "definitions") renderDefinitions();
+  };
+
+  const onUp = () => {
+    document.body.classList.remove("resizing-definition-column");
+    activeKey = "";
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    persistDefinitionColumnWidths();
+  };
+
+  document.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest("[data-definition-resizer]");
+    if (!handle) return;
+    event.preventDefault();
+    activeKey = handle.dataset.definitionResizer;
+    startX = event.clientX;
+    startWidth = definitionColumnWidths[activeKey] || definitionColumnDefaultWidths[activeKey];
+    document.body.classList.add("resizing-definition-column");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  });
+}
+
 function bindEvents() {
   document.querySelectorAll("[data-horizon]").forEach((button) => {
     button.addEventListener("change", () => {
@@ -1839,6 +1936,7 @@ function bindEvents() {
   });
 
   bindPanelResizer();
+  bindDefinitionColumnResizers();
 }
 
 async function loadData() {
@@ -1864,6 +1962,7 @@ async function init() {
   try {
     applyTheme();
     restoreControlsWidth();
+    restoreDefinitionColumnWidths();
     state.datasets = normalizePayload(await loadData());
     const indexParam = new URLSearchParams(window.location.search).get("index")?.toUpperCase();
     state.indexFamily = indexParam && state.datasets[indexParam] ? indexParam : "CPI";

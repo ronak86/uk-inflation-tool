@@ -1053,7 +1053,7 @@ body.resizing-controls {
   border-spacing: 0;
   font-size: 12px;
   table-layout: fixed;
-  width: 100%;
+  min-width: 100%;
 }
 
 .definitions-table th,
@@ -1072,10 +1072,62 @@ body.resizing-controls {
   color: #ffffff;
   font-size: 11px;
   font-weight: 800;
+  padding: 0;
   position: sticky;
   text-align: left;
   top: 0;
   z-index: 1;
+}
+
+.definition-th-inner {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  height: 100%;
+  justify-content: space-between;
+  min-height: 30px;
+  padding: 4px 0 4px 7px;
+}
+
+.definition-resizer {
+  cursor: col-resize;
+  display: block;
+  flex: 0 0 10px;
+  height: 30px;
+  position: relative;
+  touch-action: none;
+  width: 10px;
+}
+
+.definition-resizer::after {
+  background: rgba(255, 255, 255, 0.4);
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  right: 4px;
+  top: 5px;
+  width: 1px;
+}
+
+.definition-resizer:hover::after,
+body.resizing-definition-column .definition-resizer::after {
+  background: #ffc000;
+  width: 2px;
+}
+
+.definitions-table th[data-definition-col="level"],
+.definitions-table th[data-definition-col="weightCode"],
+.definitions-table th[data-definition-col="priceCode"] {
+  text-align: center;
+}
+
+.definitions-table th[data-definition-col="latestWeight"] {
+  text-align: right;
+}
+
+body.resizing-definition-column {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .definitions-table tbody tr:nth-child(odd) {
@@ -1086,25 +1138,14 @@ body.resizing-controls {
   background: var(--excel-faint);
 }
 
-.definitions-table th:nth-child(1),
-.definitions-table td:nth-child(1) {
-  width: 36%;
-}
-
-.definitions-table th:nth-child(2),
 .definitions-table td:nth-child(2),
-.definitions-table th:nth-child(3),
 .definitions-table td:nth-child(3),
-.definitions-table th:nth-child(4),
 .definitions-table td:nth-child(4) {
   text-align: center;
-  width: 92px;
 }
 
-.definitions-table th:last-child,
 .definitions-table td:last-child {
   text-align: right;
-  width: 110px;
 }
 
 :root[data-theme="dark"] .definitions-table tbody tr:nth-child(odd) {
