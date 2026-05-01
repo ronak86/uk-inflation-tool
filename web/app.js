@@ -367,7 +367,7 @@ function leafInActiveSectors(leaf) {
   if (state.coreView === "noncore" && !sectors.nonCore) return false;
   if (state.coreView === "core" && sectors.nonCore) return false;
   if (!isRpi() && state.boeView === "boe" && !sectors.boe) return false;
-  if (!isRpi() && state.boeView === "exboe" && sectors.boe) return false;
+  if (!isRpi() && state.boeView === "exboe" && !sectors.exBoe) return false;
   return true;
 }
 
@@ -413,8 +413,8 @@ function activeBasketName() {
   if (state.sectorView === "services") parts.push("Services");
   if (state.sectorView === "goods") parts.push("Goods");
   if (state.sectorView === "housing") parts.push("Housing");
-  if (!isRpi() && state.boeView === "boe") parts.push("BoE Measure");
-  if (!isRpi() && state.boeView === "exboe") parts.push("ex BoE Measure");
+  if (!isRpi() && state.boeView === "boe") parts.push("BoE Services");
+  if (!isRpi() && state.boeView === "exboe") parts.push("ex BoE Services");
   if (parts.length === 1) return getAllItems().name;
   return `${parts.join(" ")} index`;
 }

@@ -90,9 +90,9 @@ def read_legacy_sector_defs(workbook) -> dict:
 def read_definitions(workbook) -> dict:
     rows = list(workbook["Definitions"].iter_rows(values_only=True))
     sector_defs = {
-        "CPIH": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
-        "CPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
-        "RPI": {"boeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
+        "CPIH": {"boeCodes": set(), "exBoeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
+        "CPI": {"boeCodes": set(), "exBoeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
+        "RPI": {"boeCodes": set(), "exBoeCodes": set(), "servicesCodes": set(), "nonCoreCodes": set(), "housingCodes": set()},
     }
     blocks = {
         "CPIH": {"weight": 1, "price": 2, "sector": 3, "core": 4, "boe": 5},
@@ -124,6 +124,8 @@ def read_definitions(workbook) -> dict:
 
             if boe == "BoE Custom Services":
                 sector_defs[series]["boeCodes"].update(clean_codes)
+            elif boe == "Ex BoE Custom Services":
+                sector_defs[series]["exBoeCodes"].update(clean_codes)
 
     return sector_defs
 
@@ -139,6 +141,7 @@ def read_sector_defs(workbook) -> dict:
 def annotate_sectors(payload: dict, sector_defs: dict) -> None:
     series_defs = sector_defs.get(payload["series"], {})
     boe_codes = series_defs.get("boeCodes", set())
+    ex_boe_codes = series_defs.get("exBoeCodes", set())
     services_codes = series_defs.get("servicesCodes", set())
     non_core_codes = series_defs.get("nonCoreCodes", set())
     housing_codes = series_defs.get("housingCodes", set())
@@ -148,6 +151,7 @@ def annotate_sectors(payload: dict, sector_defs: dict) -> None:
         codes.discard(None)
         item["sectors"] = {
             "boe": bool(codes & boe_codes),
+            "exBoe": bool(codes & ex_boe_codes),
             "services": bool(codes & services_codes),
             "nonCore": bool(codes & non_core_codes),
             "housing": bool(codes & housing_codes),
