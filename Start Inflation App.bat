@@ -5,10 +5,10 @@ cd /d "%~dp0web"
 
 set "BUNDLED_PYTHON=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
 
-echo Starting CPI/CPIH Contributions app...
+echo Starting UK Inflation app...
 echo.
 echo Keep this window open while using the app.
-echo Open: http://127.0.0.1:8000/?v=cpi-enabled-2
+echo Open: http://127.0.0.1:8000/?v=latest
 echo.
 
 if exist "%BUNDLED_PYTHON%" (

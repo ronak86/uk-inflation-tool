@@ -1865,11 +1865,12 @@ async function loadData() {
   try {
     const appScript = document.querySelector('script[src*="app.js"]');
     const appBase = appScript ? new URL(".", appScript.src) : new URL(".", window.location.href);
-    const dataUrl = new URL(`data/cpih.json?v=${Date.now()}`, appBase);
+    const dataUrl = new URL(`data/inflation.json?v=${Date.now()}`, appBase);
     const response = await fetch(dataUrl, { cache: "no-store" });
     if (!response.ok) throw new Error(`Data request failed: ${response.status}`);
     return response.json();
   } catch (error) {
+    if (window.INFLATION_DATA) return window.INFLATION_DATA;
     if (window.CPIH_DATA) return window.CPIH_DATA;
     throw error;
   }

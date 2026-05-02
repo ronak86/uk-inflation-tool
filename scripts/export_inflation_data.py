@@ -9,8 +9,8 @@ from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "Weights And Prices.xlsx"
-OUTPUT = ROOT / "web" / "data" / "cpih.json"
-JS_OUTPUT = ROOT / "web" / "data" / "cpih-data.js"
+OUTPUT = ROOT / "web" / "data" / "inflation.json"
+JS_OUTPUT = ROOT / "web" / "data" / "inflation-data.js"
 
 
 def iso_month(value) -> str:
@@ -255,7 +255,7 @@ def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     payload_json = json.dumps(payload, separators=(",", ":"))
     OUTPUT.write_text(payload_json, encoding="utf-8")
-    JS_OUTPUT.write_text(f"window.CPIH_DATA={payload_json};\n", encoding="utf-8")
+    JS_OUTPUT.write_text(f"window.INFLATION_DATA={payload_json};\n", encoding="utf-8")
     summary = ", ".join(
         f"{series}: {len(data['items'])} items, {len(data['months'])} months"
         for series, data in series_payloads.items()

@@ -19,14 +19,14 @@ echo This rebuilds:
 echo   - CPI, CPIH and RPI weights/prices
 echo   - 3dp headline overall indices
 echo   - Definitions flags: Services, Goods, RPI Housing, Non Core, BoE Measure
-echo   - web\data\cpih.json
-echo   - web\data\cpih-data.js
+echo   - web\data\inflation.json
+echo   - web\data\inflation-data.js
 echo.
 
 if exist "%BUNDLED_PYTHON%" (
-  "%BUNDLED_PYTHON%" scripts\export_cpih_data.py
+  "%BUNDLED_PYTHON%" scripts\export_inflation_data.py
 ) else (
-  py -3 scripts\export_cpih_data.py
+  py -3 scripts\export_inflation_data.py
 )
 
 if errorlevel 1 (
