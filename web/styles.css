@@ -522,12 +522,31 @@ body.resizing-controls {
 }
 
 .panel-tools {
-  display: grid;
-  gap: 6px;
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
 }
 
 .panel-tools .theme-toggle {
-  justify-self: start;
+  flex: 0 0 auto;
+}
+
+.panel-basket-image {
+  aspect-ratio: 16 / 9;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, white);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(15, 35, 50, 0.12);
+  display: block;
+  height: 34px;
+  object-fit: cover;
+  object-position: center;
+  width: 64px;
+}
+
+:root[data-theme="dark"] .panel-basket-image {
+  border-color: #405160;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
 }
 
 .control-group,
