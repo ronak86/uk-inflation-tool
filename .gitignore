@@ -5,3 +5,5 @@ outputs/
 *.xlsm
 *.pdf
 Weights And Prices.xlsx
+Weights And Prices backup *.xlsx
+raw_ons/
