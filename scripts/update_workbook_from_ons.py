@@ -163,18 +163,24 @@ def read_weight_series(raw_wb, table_name: str, target_month: datetime, header_r
 def read_3dp_overall(raw_wb, code: str) -> tuple[datetime, float]:
     sheet = raw_wb[OVERALL_3DP[code]["table"]]
     code_col = None
-    for col in range(1, sheet.max_column + 1):
-        if clean_code(sheet.cell(6, col).value) == code:
-            code_col = col
-            break
+    for row_number, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        if row_number != 6:
+            continue
+        for index, value in enumerate(row):
+            if clean_code(value) == code:
+                code_col = index
+                break
+        break
     if code_col is None:
         raise ValueError(f"Could not find {code} in {sheet.title}")
 
     latest_month = None
     latest_value = None
-    for row in range(8, sheet.max_row + 1):
-        date_value = sheet.cell(row, 2).value
-        value = sheet.cell(row, code_col).value
+    for row_number, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        if row_number < 8 or len(row) <= code_col:
+            continue
+        date_value = row[1] if len(row) > 1 else None
+        value = row[code_col]
         if isinstance(date_value, datetime) and isinstance(value, (int, float)):
             latest_month = datetime(date_value.year, date_value.month, 1)
             latest_value = float(value)
