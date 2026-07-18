@@ -1,9 +1,11 @@
 tmp/
 outputs/
+.agents/
 .claude/
 ~$*
 *.xlsm
 *.pdf
+Weights And Prices - Copy.xlsx
 Weights And Prices backup *.xlsx
 raw_ons/
 logs/
