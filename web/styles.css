@@ -140,6 +140,10 @@ button {
   display: none !important;
 }
 
+.mobile-blocker {
+  display: none;
+}
+
 .app {
   margin: 0;
   max-width: none;
@@ -1587,6 +1591,68 @@ tbody tr.selected-row .level-pill {
 }
 
 @media (max-width: 760px) {
+  body {
+    background:
+      radial-gradient(circle at 110% 20%, rgba(157, 195, 230, 0.55) 0 34%, transparent 35%),
+      linear-gradient(180deg, #edf3f7 0%, #f7f9fb 100%);
+    overflow: hidden;
+  }
+
+  .app {
+    display: none;
+  }
+
+  .mobile-blocker {
+    align-items: center;
+    display: flex;
+    min-height: 100dvh;
+    padding: 24px;
+  }
+
+  .mobile-blocker-card {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    margin: 0 auto;
+    max-width: 360px;
+    padding: 18px;
+    text-align: left;
+  }
+
+  .mobile-blocker-card img {
+    border-radius: 8px;
+    display: block;
+    height: auto;
+    margin: 0 0 14px;
+    width: 78px;
+  }
+
+  .mobile-blocker-card h1 {
+    color: var(--excel-dark);
+    font-size: 22px;
+    line-height: 1.15;
+    margin: 0 0 10px;
+  }
+
+  .mobile-blocker-card p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.45;
+    margin: 0 0 8px;
+  }
+
+  :root[data-theme="dark"] body {
+    background:
+      radial-gradient(circle at 110% 20%, rgba(36, 183, 211, 0.22) 0 34%, transparent 35%),
+      linear-gradient(180deg, #0b1118 0%, #101923 100%);
+  }
+
+  :root[data-theme="dark"] .mobile-blocker-card {
+    background: rgba(21, 35, 49, 0.94);
+  }
+
   .app {
     padding: 6px 8px 8px;
   }
