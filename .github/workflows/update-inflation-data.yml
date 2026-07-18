@@ -1,0 +1,77 @@
+name: Update inflation data
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub cron is UTC. July to October release times are 07:05 London / 06:05 UTC.
+    - cron: "5 6 22 7 *"
+    - cron: "5 6 19 8 *"
+    - cron: "5 6 16 9 *"
+    - cron: "5 6 21 10 *"
+    # November to February release times are 07:05 London / 07:05 UTC.
+    - cron: "5 7 18 11 *"
+    - cron: "5 7 16 12 *"
+    - cron: "5 7 20 1 *"
+    - cron: "5 7 17 2 *"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check release date
+        id: date-check
+        shell: bash
+        run: |
+          today="$(TZ=Europe/London date +%Y-%m-%d)"
+          case "$today" in
+            2026-07-22|2026-08-19|2026-09-16|2026-10-21|2026-11-18|2026-12-16|2027-01-20|2027-02-17)
+              echo "run_update=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                echo "run_update=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "run_update=false" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+          esac
+
+      - name: Check out repo
+        if: steps.date-check.outputs.run_update == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.date-check.outputs.run_update == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        if: steps.date-check.outputs.run_update == 'true'
+        run: python -m pip install --upgrade openpyxl
+
+      - name: Download ONS workbook and update source workbook
+        if: steps.date-check.outputs.run_update == 'true'
+        run: python -u scripts/update_workbook_from_ons.py --download
+
+      - name: Rebuild website data
+        if: steps.date-check.outputs.run_update == 'true'
+        run: python scripts/export_inflation_data.py
+
+      - name: Commit and push updated data
+        if: steps.date-check.outputs.run_update == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "Weights And Prices.xlsx" web/data/inflation.json web/data/inflation-data.js
+          if git diff --cached --quiet; then
+            echo "No inflation data changes to commit."
+            exit 0
+          fi
+          git commit -m "Update inflation data $(TZ=Europe/London date +%Y-%m-%d)"
+          git push
