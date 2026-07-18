@@ -292,6 +292,7 @@ def update_3dp_overall(workbook, raw_wb) -> dict[str, Any]:
 def download_ons_file(url: str, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / f"consumerpriceinflationdetailedreferencetables_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    print(f"Downloading ONS workbook to {target}...", flush=True)
     request = urllib.request.Request(
         url,
         headers={
@@ -308,6 +309,7 @@ def download_ons_file(url: str, output_dir: Path) -> Path:
     )
     with urllib.request.urlopen(request) as response, target.open("wb") as output:
         shutil.copyfileobj(response, output)
+    print(f"Downloaded ONS workbook: {target.stat().st_size:,} bytes", flush=True)
     return target
 
 
@@ -345,20 +347,34 @@ def main() -> int:
     if not args.workbook.exists():
         raise FileNotFoundError(args.workbook)
 
+    print(f"Opening ONS workbook: {ons_path}", flush=True)
     raw_wb = load_workbook(ons_path, read_only=True, data_only=True)
+    print(f"Opening curated workbook: {args.workbook}", flush=True)
     workbook = load_workbook(args.workbook)
 
-    results = [update_series(workbook, raw_wb, series) for series in ("CPIH", "CPI", "RPI")]
+    results = []
+    for series in ("CPIH", "CPI", "RPI"):
+        print(f"Updating {series} weights and prices...", flush=True)
+        result = update_series(workbook, raw_wb, series)
+        results.append(result)
+        print(
+            f"Updated {series} {result['month']}: "
+            f"{result['prices_updated']} prices, {result['weights_updated']} weights",
+            flush=True,
+        )
     fail_if_missing_codes(results, args.allow_missing)
+    print("Updating 3dpOverall...", flush=True)
     overall_result = update_3dp_overall(workbook, raw_wb)
 
     output = args.output or args.workbook
     if output == args.workbook and not args.no_backup:
         backup = args.workbook.with_name(f"{args.workbook.stem} backup {datetime.now():%Y%m%d_%H%M%S}{args.workbook.suffix}")
         shutil.copy2(args.workbook, backup)
-        print(f"Backup written: {backup}")
+        print(f"Backup written: {backup}", flush=True)
 
+    print(f"Saving updated workbook: {output}", flush=True)
     workbook.save(output)
+    print("Save complete.", flush=True)
 
     print(f"Updated workbook: {output}")
     for result in results:

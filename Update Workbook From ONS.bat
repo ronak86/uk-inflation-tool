@@ -13,18 +13,18 @@ if "%~1"=="" (
   echo Downloading the latest ONS workbook from the standard ONS URL.
   echo.
   if exist "%BUNDLED_PYTHON%" (
-    "%BUNDLED_PYTHON%" scripts\update_workbook_from_ons.py --download
+    "%BUNDLED_PYTHON%" -u scripts\update_workbook_from_ons.py --download
   ) else (
-    py -3 scripts\update_workbook_from_ons.py --download
+    py -3 -u scripts\update_workbook_from_ons.py --download
   )
 ) else (
   echo Using local ONS workbook:
   echo %~1
   echo.
   if exist "%BUNDLED_PYTHON%" (
-    "%BUNDLED_PYTHON%" scripts\update_workbook_from_ons.py --ons "%~1"
+    "%BUNDLED_PYTHON%" -u scripts\update_workbook_from_ons.py --ons "%~1"
   ) else (
-    py -3 scripts\update_workbook_from_ons.py --ons "%~1"
+    py -3 -u scripts\update_workbook_from_ons.py --ons "%~1"
   )
 )
 
