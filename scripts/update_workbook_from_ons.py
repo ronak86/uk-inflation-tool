@@ -258,18 +258,22 @@ def update_3dp_overall(workbook, raw_wb) -> dict[str, Any]:
     latest_month = months.pop()
 
     row = None
+    last_date_row = None
+    last_date = None
     for candidate in range(2, sheet.max_row + 1):
         value = sheet.cell(candidate, 1).value
-        if isinstance(value, datetime) and value.strftime("%Y-%m") == latest_month.strftime("%Y-%m"):
+        if not isinstance(value, datetime):
+            continue
+        last_date_row = candidate
+        last_date = value
+        if value.strftime("%Y-%m") == latest_month.strftime("%Y-%m"):
             row = candidate
-            break
     if row is None:
-        last_date = sheet.cell(sheet.max_row, 1).value
-        if not isinstance(last_date, datetime) or latest_month <= last_date:
+        if not isinstance(last_date, datetime) or last_date_row is None or latest_month <= last_date:
             raise ValueError(f"Cannot append 3dp overall month {latest_month:%Y-%m}")
-        row = sheet.max_row + 1
+        row = last_date_row + 1
         for col in range(1, sheet.max_column + 1):
-            source = sheet.cell(row - 1, col)
+            source = sheet.cell(last_date_row, col)
             target = sheet.cell(row, col)
             if source.has_style:
                 target._style = copy(source._style)
@@ -288,7 +292,22 @@ def update_3dp_overall(workbook, raw_wb) -> dict[str, Any]:
 def download_ons_file(url: str, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / f"consumerpriceinflationdetailedreferencetables_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
-    urllib.request.urlretrieve(url, target)
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/126.0 Safari/537.36"
+            ),
+            "Accept": (
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+                "application/octet-stream,*/*"
+            ),
+        },
+    )
+    with urllib.request.urlopen(request) as response, target.open("wb") as output:
+        shutil.copyfileobj(response, output)
     return target
 
 
