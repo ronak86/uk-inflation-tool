@@ -1590,7 +1590,7 @@ tbody tr.selected-row .level-pill {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1099px) {
   body {
     background:
       radial-gradient(circle at 110% 20%, rgba(157, 195, 230, 0.55) 0 34%, transparent 35%),
