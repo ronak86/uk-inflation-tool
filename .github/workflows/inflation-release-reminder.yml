@@ -1,0 +1,65 @@
+name: Inflation release reminder
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub cron is UTC. July to October reminders are 21:00 London / 20:00 UTC.
+    - cron: "0 20 21 7 *"
+    - cron: "0 20 18 8 *"
+    - cron: "0 20 15 9 *"
+    - cron: "0 20 20 10 *"
+    # November to February reminders are 21:00 London / 21:00 UTC.
+    - cron: "0 21 17 11 *"
+    - cron: "0 21 15 12 *"
+    - cron: "0 21 19 1 *"
+    - cron: "0 21 16 2 *"
+
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check reminder date
+        id: date-check
+        shell: bash
+        run: |
+          today="$(TZ=Europe/London date +%Y-%m-%d)"
+          tomorrow="$(TZ=Europe/London date -d 'tomorrow' +%Y-%m-%d)"
+          case "$today" in
+            2026-07-21|2026-08-18|2026-09-15|2026-10-20|2026-11-17|2026-12-15|2027-01-19|2027-02-16)
+              echo "send_reminder=true" >> "$GITHUB_OUTPUT"
+              echo "release_date=$tomorrow" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                echo "send_reminder=true" >> "$GITHUB_OUTPUT"
+                echo "release_date=$tomorrow" >> "$GITHUB_OUTPUT"
+              else
+                echo "send_reminder=false" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+          esac
+
+      - name: Check out repo
+        if: steps.date-check.outputs.send_reminder == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.date-check.outputs.send_reminder == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Send reminder email
+        if: steps.date-check.outputs.send_reminder == 'true'
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          NOTIFY_EMAIL_FROM: ${{ secrets.NOTIFY_EMAIL_FROM }}
+          NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}
+        run: |
+          python scripts/send_notification_email.py \
+            --subject "UK Inflation Tool will update tomorrow" \
+            --body "Inflation release is scheduled for ${{ steps.date-check.outputs.release_date }}. GitHub Actions will run the UK Inflation Tool update at 07:05 London time tomorrow morning. If ONS publishes late, run the workflow manually from GitHub Actions."

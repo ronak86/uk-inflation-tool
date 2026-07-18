@@ -63,6 +63,7 @@ jobs:
         run: python scripts/export_inflation_data.py
 
       - name: Commit and push updated data
+        id: commit-push
         if: steps.date-check.outputs.run_update == 'true'
         shell: bash
         run: |
@@ -71,7 +72,37 @@ jobs:
           git add "Weights And Prices.xlsx" web/data/inflation.json web/data/inflation-data.js
           if git diff --cached --quiet; then
             echo "No inflation data changes to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "Update inflation data $(TZ=Europe/London date +%Y-%m-%d)"
           git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Send success email
+        if: steps.date-check.outputs.run_update == 'true' && success()
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          NOTIFY_EMAIL_FROM: ${{ secrets.NOTIFY_EMAIL_FROM }}
+          NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}
+        run: |
+          python scripts/send_notification_email.py \
+            --subject "UK Inflation Tool website updated" \
+            --body "The scheduled UK Inflation Tool update has finished successfully. Data changes committed: ${{ steps.commit-push.outputs.changed }}. Live site: https://chitroda.com/inflation.html"
+
+      - name: Send failure email
+        if: steps.date-check.outputs.run_update == 'true' && failure()
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          NOTIFY_EMAIL_FROM: ${{ secrets.NOTIFY_EMAIL_FROM }}
+          NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}
+        run: |
+          python scripts/send_notification_email.py \
+            --subject "UK Inflation Tool update failed" \
+            --body "The scheduled UK Inflation Tool update failed. Check the GitHub Actions run here: https://github.com/ronak86/uk-inflation-tool/actions/workflows/update-inflation-data.yml"

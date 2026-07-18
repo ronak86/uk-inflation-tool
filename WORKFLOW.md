@@ -37,6 +37,12 @@ https://github.com/ronak86/uk-inflation-tool
 - `.github/workflows/update-inflation-data.yml`  
   The GitHub Actions cloud scheduler.
 
+- `.github/workflows/inflation-release-reminder.yml`  
+  Sends a notification at 21:00 London time the night before each scheduled release.
+
+- `scripts/send_notification_email.py`  
+  Sends notification emails from GitHub Actions using SMTP credentials stored as GitHub Secrets.
+
 ## What Happens on GitHub
 
 GitHub Actions runs the workflow named `Update inflation data`.
@@ -62,8 +68,27 @@ On each scheduled run GitHub will:
 6. Commit the changed workbook and generated data files.
 7. Push the commit to `main`.
 8. GitHub Pages updates the live website automatically.
+9. A notification email is sent when the update finishes successfully or fails.
 
 The PC does not need to be switched on for this cloud workflow to run.
+
+## Notifications
+
+The repo has two email notification points:
+
+1. The night before each release at 21:00 London time, GitHub sends a reminder that the app is due to update the next morning.
+2. After the scheduled update completes, GitHub sends either a success email or a failure email.
+
+The emails require these GitHub repository secrets:
+
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `NOTIFY_EMAIL_FROM`
+- `NOTIFY_EMAIL_TO`
+
+For Gmail, use an app password rather than your normal Google password.
 
 ## Manual GitHub Run
 
