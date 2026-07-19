@@ -911,12 +911,11 @@ function shortMonth(month) {
 
 function visibleMonthIndices() {
   const count = state.data.months.length;
-  if (state.timeRange === "all") {
-    return state.data.months.map((_, index) => index);
-  }
-  const monthsToShow = Number(state.timeRange) * 12;
-  const start = Math.max(0, count - monthsToShow);
-  return state.data.months.map((_, index) => index).slice(start);
+  const allIndices = state.data.months.map((_, index) => index);
+  const visible = state.timeRange === "all"
+    ? allIndices
+    : allIndices.slice(Math.max(0, count - (Number(state.timeRange) * 12)));
+  return visible.reverse();
 }
 
 function isMobileExplorer() {
