@@ -17,15 +17,18 @@
     <meta name="twitter:image" content="https://chitroda.com/web/assets/inflation-preview.png" />
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="assets/favicon.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=mobile-desktop-note-2" />
+    <link rel="stylesheet" href="styles.css?v=mobile-explorer-2" />
   </head>
   <body>
-    <section class="mobile-blocker" aria-label="Desktop required">
+    <section class="mobile-blocker" aria-label="Choose a mobile view">
       <div class="mobile-blocker-card">
         <img src="assets/uk-inflation-basket.png" alt="" />
         <h1>UK Inflation Tool</h1>
-        <p>This tool is built for desktop screens because the main view is a wide spreadsheet-style table.</p>
-        <p>Please open it on a laptop, desktop, or a wider tablet for the full experience.</p>
+        <p>Use the phone-friendly explorer one month at a time, or open the complete spreadsheet view.</p>
+        <div class="mobile-entry-actions">
+          <button class="mobile-primary-action" type="button" data-mobile-entry="explorer">Open Mobile Explorer</button>
+          <button type="button" data-mobile-entry="desktop">Continue to Desktop Table</button>
+        </div>
       </div>
     </section>
     <main class="app">
@@ -49,6 +52,10 @@
 
       <section class="workspace">
         <aside class="controls" aria-label="Controls">
+          <div class="mobile-controls-head">
+            <strong>Filters</strong>
+            <button type="button" id="mobileFiltersClose" aria-label="Close filters">Close</button>
+          </div>
           <div class="panel-tools">
             <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false" title="Toggle light and dark mode">
               <span class="sun" aria-hidden="true"></span>
@@ -57,7 +64,7 @@
             <img class="panel-basket-image" src="assets/uk-inflation-basket.png" alt="Inflation basket" />
           </div>
 
-          <div class="control-group">
+          <div class="control-group" data-desktop-range-control>
             <span class="label">Last</span>
             <div class="radio-row vertical" role="radiogroup" aria-label="Time range">
               <label><input type="radio" name="timeRange" value="1" data-time-range="1" checked /> <span>1 year</span></label>
@@ -138,6 +145,11 @@
         <div class="panel-resizer" id="panelResizer" role="separator" aria-orientation="vertical" aria-label="Resize controls panel" tabindex="0"></div>
 
         <div class="content">
+          <div class="mobile-toolbar" aria-label="Mobile explorer controls">
+            <button type="button" id="mobileFiltersOpen">Filters</button>
+            <strong id="mobileSelectionSummary">CPI · MoM · Contribution</strong>
+            <button type="button" id="mobileDesktopView">Desktop table</button>
+          </div>
           <div class="content-top">
             <nav class="tabs chrome-tabs content-tabs" aria-label="Views">
               <button class="active" data-tab="explorer">Explorer</button>
@@ -153,6 +165,14 @@
           </div>
 
           <section class="panel active" id="explorerPanel">
+            <div class="mobile-month-nav" aria-label="Choose month">
+              <button type="button" id="mobileMonthPrevious" aria-label="Previous month">&#8249;</button>
+              <label>
+                <span class="sr-only">Month</span>
+                <select id="mobileMonthSelect" aria-label="Month"></select>
+              </label>
+              <button type="button" id="mobileMonthNext" aria-label="Next month">&#8250;</button>
+            </div>
             <div class="table-shell">
               <table id="itemTable">
                 <colgroup id="itemCols"></colgroup>
@@ -255,9 +275,11 @@
 
     <div class="context-menu" id="chartContextMenu" hidden></div>
     <div class="chart-tooltip" id="chartTooltip" hidden></div>
+    <button class="mobile-view-return" id="mobileViewReturn" type="button">Mobile view</button>
+    <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop"></div>
 
     <script src="data/inflation-data.js?v=rename-inflation-1"></script>
-    <script src="app.js?v=rename-inflation-1"></script>
+    <script src="app.js?v=mobile-explorer-2"></script>
     <!-- Cloudflare Web Analytics -->
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "4377e92dc4aa4a8abcc0578fdf2fa15f"}'></script>
     <!-- End Cloudflare Web Analytics -->

@@ -44,11 +44,21 @@ const els = {
   errorsPanel: document.querySelector("#errorsPanel"),
   themeToggle: document.querySelector("#themeToggle"),
   panelResizer: document.querySelector("#panelResizer"),
+  mobileFiltersOpen: document.querySelector("#mobileFiltersOpen"),
+  mobileFiltersClose: document.querySelector("#mobileFiltersClose"),
+  mobileDrawerBackdrop: document.querySelector("#mobileDrawerBackdrop"),
+  mobileDesktopView: document.querySelector("#mobileDesktopView"),
+  mobileViewReturn: document.querySelector("#mobileViewReturn"),
+  mobileMonthPrevious: document.querySelector("#mobileMonthPrevious"),
+  mobileMonthNext: document.querySelector("#mobileMonthNext"),
+  mobileMonthSelect: document.querySelector("#mobileMonthSelect"),
+  mobileSelectionSummary: document.querySelector("#mobileSelectionSummary"),
 };
 
 const controlsWidthStorageKey = "ukInflationControlsWidth";
 const controlsWidthMin = 150;
 const controlsWidthMax = 340;
+const mobileViewportQuery = window.matchMedia("(max-width: 1099px)");
 
 const calcCache = {
   key: "",
@@ -909,6 +919,56 @@ function visibleMonthIndices() {
   return state.data.months.map((_, index) => index).slice(start);
 }
 
+function isMobileExplorer() {
+  return mobileViewportQuery.matches && document.body.classList.contains("mobile-explorer");
+}
+
+function syncResponsiveMode(event = mobileViewportQuery) {
+  if (event.matches) return;
+  const hadMobileMode = document.body.classList.contains("mobile-explorer") || document.body.classList.contains("mobile-desktop");
+  document.body.classList.remove("mobile-explorer", "mobile-desktop", "mobile-filters-open");
+  if (hadMobileMode && state.data) render();
+}
+
+function setMobileView(mode) {
+  if (!mobileViewportQuery.matches) {
+    syncResponsiveMode();
+    return;
+  }
+  document.body.classList.remove("mobile-explorer", "mobile-desktop", "mobile-filters-open");
+  document.body.classList.add(mode === "desktop" ? "mobile-desktop" : "mobile-explorer");
+  if (mode === "explorer") {
+    state.activeTab = "explorer";
+    setActiveButtons("[data-tab]", state.activeTab, "tab");
+    els.explorerPanel.classList.add("active");
+    els.chartPanel?.classList.remove("active");
+    els.definitionsPanel?.classList.remove("active");
+    els.featuresPanel.classList.remove("active");
+    els.errorsPanel.classList.remove("active");
+  }
+  render();
+  window.scrollTo({ top: 0, left: 0 });
+}
+
+function renderMobileChrome() {
+  if (!state.data) return;
+  const measure = {
+    contribution: "Contribution",
+    price: "Price change",
+    weight: "Weight",
+  }[state.measure];
+  if (els.mobileSelectionSummary) {
+    els.mobileSelectionSummary.textContent = `${state.indexFamily} · ${state.horizon === "mom" ? "MoM" : "YoY"} · ${measure}`;
+  }
+  if (els.mobileMonthSelect) {
+    els.mobileMonthSelect.innerHTML = state.data.months
+      .map((month, index) => `<option value="${index}" ${index === state.monthIndex ? "selected" : ""}>${formatMonth(month)}</option>`)
+      .join("");
+  }
+  if (els.mobileMonthPrevious) els.mobileMonthPrevious.disabled = state.monthIndex <= 0;
+  if (els.mobileMonthNext) els.mobileMonthNext.disabled = state.monthIndex >= state.data.months.length - 1;
+}
+
 function renderSummary() {
 }
 
@@ -981,34 +1041,38 @@ function expandableItemIds() {
 }
 
 function renderExplorer() {
+  const mobile = isMobileExplorer();
   const measureTitle = {
     weight: "Wgt, %",
     price: `Price Chg, % (${state.horizon === "mom" ? "MoM" : "YoY"})`,
     contribution: "Ctrb, bp",
   }[state.measure];
   els.itemRows.dataset.view = state.levelView;
-  const monthCount = visibleMonthIndices().length;
+  const monthIndices = mobile ? [state.monthIndex] : visibleMonthIndices();
+  const monthCount = monthIndices.length;
   const tableClass =
-    monthCount <= 12 ? "range-compact" : monthCount <= 24 ? "range-two-year" : "range-scroll";
+    mobile ? "mobile-explorer-table" : monthCount <= 12 ? "range-compact" : monthCount <= 24 ? "range-two-year" : "range-scroll";
   const fixedColumnWidth = 746;
   document.documentElement.style.setProperty("--month-count", monthCount);
   document.documentElement.style.setProperty("--fixed-col-width", `${fixedColumnWidth}px`);
   document.documentElement.style.setProperty("--month-col-width", "64px");
   els.itemTable.className = tableClass;
 
-  els.itemCols.innerHTML = `
+  els.itemCols.innerHTML = mobile ? `
+      <col class="col-name" />
+      <col class="col-mobile-value" />
+  ` : `
       <col class="col-name" />
       <col class="col-level" />
       <col class="col-weight-code" />
       <col class="col-price-code" />
-      ${visibleMonthIndices().map(() => `<col class="col-month" />`).join("")}
+      ${monthIndices.map(() => `<col class="col-month" />`).join("")}
   `;
 
-  const monthIndices = visibleMonthIndices();
   const nameSortIcon =
     state.sort.type === "name" ? `<span class="sort-icon sort-icon-az" aria-label="Sorted A to Z"></span>` : "";
   const treeActions =
-    state.levelView === "all"
+    state.levelView === "all" && !mobile
       ? `
         <span class="header-tree-actions" aria-label="Tree controls">
           <button type="button" data-tree-action="expand" title="Expand all" aria-label="Expand all">Expand All</button>
@@ -1019,14 +1083,13 @@ function renderExplorer() {
   els.itemHead.innerHTML = `
     <tr>
       <th class="sticky-name sortable-header ${state.sort.type === "name" ? "sorted-header" : ""}" data-sort-name="true" title="Right-click to sort A to Z"><span class="header-label">Name</span>${treeActions}${nameSortIcon}</th>
-      <th class="meta-col">Level</th>
-      <th class="meta-col code-col">Weight Code</th>
-      <th class="meta-col code-col">Price Code</th>
+      ${mobile ? "" : `<th class="meta-col">Level</th><th class="meta-col code-col">Weight Code</th><th class="meta-col code-col">Price Code</th>`}
       ${monthIndices
         .map(
           (index) => `
             <th class="number month-head sortable-header ${state.sort.type === "month" && state.sort.monthIndex === index ? "sorted-header" : ""}" data-sort-month="${index}" title="Right-click to sort largest to smallest">
               <span class="month-label" title="${formatMonth(state.data.months[index])}">${shortMonth(state.data.months[index])}</span>
+              ${mobile ? `<span class="mobile-measure-title">${measureTitle}</span>` : ""}
               ${state.sort.type === "month" && state.sort.monthIndex === index ? `<span class="sort-icon sort-icon-desc" aria-label="Sorted largest to smallest"></span>` : ""}
             </th>
           `,
@@ -1037,7 +1100,7 @@ function renderExplorer() {
 
   const rows = visibleItems()
     .map((item) => {
-      const values = visibleMonthIndices()
+      const values = monthIndices
         .map((monthIndex) => {
           let value;
           if (state.measure === "weight") value = weightMeasureValue(item, monthIndex);
@@ -1063,9 +1126,7 @@ function renderExplorer() {
               <span>${displayName(item)}</span>
             </div>
           </td>
-          <td class="meta-cell"><span class="level-pill">L${item.level}</span></td>
-          <td class="meta-cell code-cell">${codeLinkHtml(displayWeightCode(item))}</td>
-          <td class="meta-cell code-cell">${codeLinkHtml(displayPriceCode(item))}</td>
+          ${mobile ? "" : `<td class="meta-cell"><span class="level-pill">L${item.level}</span></td><td class="meta-cell code-cell">${codeLinkHtml(displayWeightCode(item))}</td><td class="meta-cell code-cell">${codeLinkHtml(displayPriceCode(item))}</td>`}
           ${values}
         </tr>
       `;
@@ -1140,7 +1201,7 @@ function visibleTableTsv() {
     price: `Price Chg, % (${state.horizon === "mom" ? "MoM" : "YoY"})`,
     contribution: "Ctrb, bp",
   }[state.measure];
-  const monthIndices = visibleMonthIndices();
+  const monthIndices = isMobileExplorer() ? [state.monthIndex] : visibleMonthIndices();
   const header = ["Name", "Level", "Wgt Code", "Px Code", ...monthIndices.map((index) => shortMonth(state.data.months[index]))];
   const rows = visibleItems().map((item) => [
     displayName(item),
@@ -1537,6 +1598,7 @@ function renderErrors() {
 
 function render() {
   renderSummary();
+  renderMobileChrome();
   if (state.activeTab === "explorer") {
     renderExplorer();
   } else if (state.activeTab === "definitions") {
@@ -1676,6 +1738,42 @@ function bindPanelResizer() {
 }
 
 function bindEvents() {
+  if (typeof mobileViewportQuery.addEventListener === "function") {
+    mobileViewportQuery.addEventListener("change", syncResponsiveMode);
+  } else {
+    mobileViewportQuery.addListener(syncResponsiveMode);
+  }
+
+  document.querySelectorAll("[data-mobile-entry]").forEach((button) => {
+    button.addEventListener("click", () => setMobileView(button.dataset.mobileEntry));
+  });
+
+  els.mobileFiltersOpen?.addEventListener("click", () => {
+    document.body.classList.add("mobile-filters-open");
+  });
+  const closeMobileFilters = () => document.body.classList.remove("mobile-filters-open");
+  els.mobileFiltersClose?.addEventListener("click", closeMobileFilters);
+  els.mobileDrawerBackdrop?.addEventListener("click", closeMobileFilters);
+  els.mobileDesktopView?.addEventListener("click", () => setMobileView("desktop"));
+  els.mobileViewReturn?.addEventListener("click", () => setMobileView("explorer"));
+  els.mobileMonthSelect?.addEventListener("change", () => {
+    state.monthIndex = Number(els.mobileMonthSelect.value);
+    state.sort = { type: "name", monthIndex: null };
+    render();
+  });
+  els.mobileMonthPrevious?.addEventListener("click", () => {
+    if (state.monthIndex <= 0) return;
+    state.monthIndex -= 1;
+    state.sort = { type: "name", monthIndex: null };
+    render();
+  });
+  els.mobileMonthNext?.addEventListener("click", () => {
+    if (state.monthIndex >= state.data.months.length - 1) return;
+    state.monthIndex += 1;
+    state.sort = { type: "name", monthIndex: null };
+    render();
+  });
+
   document.querySelectorAll("[data-horizon]").forEach((button) => {
     button.addEventListener("change", () => {
       state.horizon = button.dataset.horizon;
@@ -1884,6 +1982,7 @@ function normalizePayload(payload) {
 async function init() {
   try {
     applyTheme();
+    syncResponsiveMode();
     restoreControlsWidth();
     state.datasets = normalizePayload(await loadData());
     const indexParam = new URLSearchParams(window.location.search).get("index")?.toUpperCase();
