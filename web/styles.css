@@ -1600,7 +1600,7 @@ tbody tr.selected-row .level-pill {
 
 @media (max-width: 1180px) {
   .workspace {
-    grid-template-columns: 160px minmax(0, 1fr);
+    grid-template-columns: var(--controls-width) 8px minmax(0, 1fr);
   }
 
   .level-control {
@@ -1715,6 +1715,14 @@ tbody tr.selected-row .level-pill {
   body.mobile-desktop .app {
     display: block;
     min-width: 1100px;
+  }
+
+  body.mobile-desktop .workspace {
+    grid-template-columns: var(--controls-width) minmax(0, 1fr);
+  }
+
+  body.mobile-desktop .panel-resizer {
+    display: none;
   }
 
   body.mobile-desktop .mobile-view-return {
