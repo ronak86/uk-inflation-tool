@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "Weights And Prices.xlsx"
 OUTPUT = ROOT / "web" / "data" / "inflation.json"
 JS_OUTPUT = ROOT / "web" / "data" / "inflation-data.js"
+MOBILE_OUTPUT = ROOT / "mobile" / "assets" / "data" / "inflation.json"
 
 
 def iso_month(value) -> str:
@@ -253,9 +254,11 @@ def main() -> None:
     }
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    MOBILE_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     payload_json = json.dumps(payload, separators=(",", ":"))
     OUTPUT.write_text(payload_json, encoding="utf-8")
     JS_OUTPUT.write_text(f"window.INFLATION_DATA={payload_json};\n", encoding="utf-8")
+    MOBILE_OUTPUT.write_text(payload_json, encoding="utf-8")
     summary = ", ".join(
         f"{series}: {len(data['items'])} items, {len(data['months'])} months"
         for series, data in series_payloads.items()

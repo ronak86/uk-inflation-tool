@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "UK Inflation",
+    "owner": "ronak86",
+    "slug": "uk-inflation",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "ukinflation",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.chitroda.ukinflation",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#1F5F9F"
+      },
+      "package": "com.chitroda.ukinflation"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a9d87de6-de97-4853-84b8-f32a2c30abf9"
+      }
+    }
+  }
+}

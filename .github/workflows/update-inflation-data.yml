@@ -54,6 +54,23 @@ jobs:
         if: steps.date-check.outputs.run_update == 'true'
         run: python -m pip install --upgrade openpyxl
 
+      - name: Set up Node
+        if: steps.date-check.outputs.run_update == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up pnpm
+        if: steps.date-check.outputs.run_update == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: "11.9.0"
+
+      - name: Install mobile test dependencies
+        if: steps.date-check.outputs.run_update == 'true'
+        working-directory: mobile
+        run: pnpm install --frozen-lockfile
+
       - name: Download ONS workbook and update source workbook
         if: steps.date-check.outputs.run_update == 'true'
         run: python -u scripts/update_workbook_from_ons.py --download
@@ -62,6 +79,13 @@ jobs:
         if: steps.date-check.outputs.run_update == 'true'
         run: python scripts/export_inflation_data.py
 
+      - name: Validate mobile calculations
+        if: steps.date-check.outputs.run_update == 'true'
+        working-directory: mobile
+        run: |
+          pnpm typecheck
+          pnpm test
+
       - name: Commit and push updated data
         id: commit-push
         if: steps.date-check.outputs.run_update == 'true'
@@ -69,7 +93,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "Weights And Prices.xlsx" web/data/inflation.json web/data/inflation-data.js
+          git add "Weights And Prices.xlsx" web/data/inflation.json web/data/inflation-data.js mobile/assets/data/inflation.json
           if git diff --cached --quiet; then
             echo "No inflation data changes to commit."
             echo "changed=false" >> "$GITHUB_OUTPUT"
