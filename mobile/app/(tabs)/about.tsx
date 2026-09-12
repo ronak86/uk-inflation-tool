@@ -11,6 +11,8 @@ const features = [
   "Full basket drill-down and search",
   "Services, goods, core and non-core filters",
   "BoE Services and RPI housing classifications",
+  "ONS import-intensity baskets for CPI and CPIH",
+  "ONS energy-intensity baskets for CPI and CPI-derived CPIH classifications",
   "Calculation error checks",
   "Automatic live ONS data refresh with an offline fallback",
 ];
@@ -35,6 +37,8 @@ export default function AboutScreen() {
           <Text selectable style={[styles.body, { color: colors.muted }]}>All weights, index values and source series are published by the Office for National Statistics. Contribution calculations follow the ONS Consumer Prices Indices Technical Manual, 2019.</Text>
           <Text onPress={() => Linking.openURL("https://www.ons.gov.uk/")} style={[styles.link, { color: colors.blue }]}>Open the ONS website</Text>
           <Text onPress={() => Linking.openURL("https://www.ons.gov.uk/economy/inflationandpriceindices/methodologies/consumerpricesindicestechnicalmanual2019")} style={[styles.link, { color: colors.blue }]}>Read the technical manual</Text>
+          <Text onPress={() => Linking.openURL("https://www.ons.gov.uk/economy/inflationandpriceindices/datasets/contributionstothe12monthrateofcpibyimportintensity")} style={[styles.link, { color: colors.blue }]}>View import-intensity data</Text>
+          <Text onPress={() => Linking.openURL("https://www.ons.gov.uk/economy/inflationandpriceindices/articles/theenergyintensityoftheconsumerpricesindex/2022")} style={[styles.link, { color: colors.blue }]}>Read the energy-intensity methodology</Text>
         </View>
         <View style={[styles.card, { backgroundColor: colors.panel, borderColor: colors.line }]}>
           <Text selectable style={[styles.heading, { color: colors.ink }]}>Built by Ronak Chitroda</Text>

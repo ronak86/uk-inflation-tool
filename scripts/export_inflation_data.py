@@ -12,6 +12,9 @@ SOURCE = ROOT / "Weights And Prices.xlsx"
 OUTPUT = ROOT / "web" / "data" / "inflation.json"
 JS_OUTPUT = ROOT / "web" / "data" / "inflation-data.js"
 MOBILE_OUTPUT = ROOT / "mobile" / "assets" / "data" / "inflation.json"
+INTENSITY_SOURCE = ROOT / "scripts" / "data" / "ons-intensity-source"
+IMPORT_INTENSITY_SOURCE = INTENSITY_SOURCE / "import-intensity-2026-08.xlsx"
+ENERGY_INTENSITY_SOURCE = INTENSITY_SOURCE / "energy-intensity-2023.xlsx"
 
 
 def iso_month(value) -> str:
@@ -39,6 +42,101 @@ def item_prefix(name):
     if not name:
         return ""
     return str(name).strip().split(" ", 1)[0]
+
+
+def class_key(value):
+    if not value:
+        return ""
+    return str(value).strip().split(" ", 1)[0].rstrip(":")
+
+
+def class_key_candidates(value, energy=False):
+    key = class_key(value)
+    candidates = [key]
+    if "/" in key:
+        candidates.append(key.split("/", 1)[0])
+    if energy and key == "07.1.1B":
+        candidates.append("07.1.1A")
+    while "." in candidates[-1]:
+        candidates.append(candidates[-1].rsplit(".", 1)[0])
+    return list(dict.fromkeys(candidate for candidate in candidates if candidate))
+
+
+def read_intensity_definitions() -> dict:
+    import_workbook = load_workbook(IMPORT_INTENSITY_SOURCE, read_only=True, data_only=True)
+    energy_workbook = load_workbook(ENERGY_INTENSITY_SOURCE, read_only=True, data_only=True)
+    definitions = {
+        "CPI": {"import": {}, "energy": {}},
+        "CPIH": {"import": {}, "energy": {}},
+        "RPI": {"import": {}, "energy": {}},
+    }
+
+    for series, sheet_name in (
+        ("CPI", "CPI Import Intensity by Class"),
+        ("CPIH", "CPIH Import Intensity by Class"),
+    ):
+        for row in import_workbook[sheet_name].iter_rows(min_row=4, values_only=True):
+            price_code = clean_code(row[0] if len(row) > 0 else None)
+            key = class_key(row[1] if len(row) > 1 else None)
+            group = clean(row[4] if len(row) > 4 else None)
+            if not key or not group:
+                continue
+            definition = {
+                "direct": float(row[2]) if row[2] is not None else None,
+                "total": float(row[3]) if row[3] is not None else None,
+                "group": str(group),
+            }
+            definitions[series]["import"][key] = definition
+            if price_code:
+                definitions[series]["import"][price_code] = definition
+
+    for row in energy_workbook["Sheet1"].iter_rows(min_row=4, values_only=True):
+        key = class_key(row[0] if len(row) > 0 else None)
+        group = clean(row[2] if len(row) > 2 else None)
+        if not key or not group:
+            continue
+        definition = {
+            "rate": float(row[1]) if row[1] is not None else None,
+            "group": str(group),
+        }
+        definitions["CPI"]["energy"][key] = definition
+        definitions["CPIH"]["energy"][key] = definition
+
+    return definitions
+
+
+def find_intensity_definition(definitions, item, class_item, kind):
+    if kind == "import":
+        price_code = clean_code(class_item.get("priceCode"))
+        if price_code and price_code in definitions:
+            return definitions[price_code]
+    for key in class_key_candidates(class_item.get("name"), energy=kind == "energy"):
+        if key in definitions:
+            return definitions[key]
+    return None
+
+
+def annotate_intensities(payload: dict, intensity_defs: dict) -> None:
+    series = payload["series"]
+    series_defs = intensity_defs.get(series, {})
+    payload["classifications"] = {
+        "importIntensity": "official" if series in ("CPI", "CPIH") else None,
+        "energyIntensity": "official" if series == "CPI" else "cpi-derived" if series == "CPIH" else None,
+    }
+
+    class_item = None
+    for item in payload["items"]:
+        if item["level"] < 3:
+            item["intensity"] = {"import": None, "energy": None}
+            continue
+        if item["level"] == 3:
+            class_item = item
+        if class_item is None:
+            raise ValueError(f"No Level 3 parent found for {series} item {item['name']!r}")
+        item["intensity"] = {
+            "import": find_intensity_definition(series_defs.get("import", {}), item, class_item, "import"),
+            "energy": find_intensity_definition(series_defs.get("energy", {}), item, class_item, "energy"),
+        }
 
 
 def read_legacy_sector_defs(workbook) -> dict:
@@ -238,6 +336,7 @@ def main() -> None:
     workbook = load_workbook(SOURCE, read_only=True, data_only=True)
     overall_3dp = read_overall_3dp(workbook)
     sector_defs = read_sector_defs(workbook)
+    intensity_defs = read_intensity_definitions()
     series_payloads = {
         series: read_series(workbook, series)
         for series in ("CPIH", "CPI", "RPI")
@@ -247,6 +346,7 @@ def main() -> None:
             series_payloads[series]["overall3dp"] = overall
     for payload in series_payloads.values():
         annotate_sectors(payload, sector_defs)
+        annotate_intensities(payload, intensity_defs)
 
     payload = {
         "sourceWorkbook": SOURCE.name,

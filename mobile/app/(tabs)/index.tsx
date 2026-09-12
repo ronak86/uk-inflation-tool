@@ -21,13 +21,32 @@ import { colorsFor } from "@/src/theme";
 import {
   BoeView,
   CoreView,
+  EnergyIntensityView,
   FilterState,
   Horizon,
   IndexFamily,
+  ImportIntensityView,
   InflationItem,
   Measure,
   SectorView,
 } from "@/src/types";
+
+const importIntensityOptions: Array<{ label: string; value: ImportIntensityView }> = [
+  { label: "All", value: "all" }, { label: "0-10%", value: "0-10" }, { label: "10-25%", value: "10-25" },
+  { label: "25-40%", value: "25-40" }, { label: "40% plus", value: "40-plus" }, { label: "Energy", value: "energy" },
+  { label: "OOH", value: "ooh" }, { label: "Unclassified", value: "unclassified" },
+];
+
+const energyIntensityOptions: Array<{ label: string; value: EnergyIntensityView }> = [
+  { label: "All", value: "all" }, { label: "Very Low", value: "very-low" }, { label: "Low", value: "low" },
+  { label: "High", value: "high" }, { label: "Very High", value: "very-high" }, { label: "Energy", value: "energy" },
+  { label: "Rents", value: "rents" }, { label: "Unclassified", value: "unclassified" },
+];
+
+function intensityFilterValue(group: string | null | undefined) {
+  if (!group) return "unclassified";
+  return group.toLowerCase().replace("% plus", "-plus").replaceAll("%", "").replace(/\s+/g, "-");
+}
 
 const monthFormatter = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 
@@ -70,7 +89,9 @@ export default function ExplorerScreen() {
   const [family, setFamily] = useState<IndexFamily>("CPI");
   const [horizon, setHorizon] = useState<Horizon>("mom");
   const [measure, setMeasure] = useState<Measure>("contribution");
-  const [filters, setFilters] = useState<FilterState>({ sector: "all", core: "all", boe: "all" });
+  const [filters, setFilters] = useState<FilterState>({
+    sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all",
+  });
   const [monthOffsets, setMonthOffsets] = useState<Record<IndexFamily, number>>({ CPI: 0, CPIH: 0, RPI: 0 });
   const [expanded, setExpanded] = useState<Set<number>>(new Set([0]));
   const [level, setLevel] = useState("all");
@@ -80,6 +101,14 @@ export default function ExplorerScreen() {
 
   const series = useMemo(() => prepareSeries(data.series[family]), [data, family]);
   const engine = useMemo(() => new InflationEngine(series, filters), [series, filters]);
+  const availableImportOptions = useMemo(() => {
+    const values = new Set(series.items.filter((item) => item.level === 4).map((item) => intensityFilterValue(item.intensity?.import?.group)));
+    return importIntensityOptions.filter((option) => option.value === "all" || values.has(option.value));
+  }, [series]);
+  const availableEnergyOptions = useMemo(() => {
+    const values = new Set(series.items.filter((item) => item.level === 4).map((item) => intensityFilterValue(item.intensity?.energy?.group)));
+    return energyIntensityOptions.filter((option) => option.value === "all" || values.has(option.value));
+  }, [series]);
   const monthIndex = Math.max(0, series.months.length - 1 - monthOffsets[family]);
 
   const rows = useMemo(() => {
@@ -130,8 +159,13 @@ export default function ExplorerScreen() {
     setFamily(next);
     setExpanded(new Set([0]));
     setLevel("all");
-    if (next === "RPI") setFilters((current) => ({ ...current, boe: "all" }));
-    if (next !== "RPI" && filters.sector === "housing") setFilters((current) => ({ ...current, sector: "all" }));
+    setFilters((current) => ({
+      ...current,
+      boe: next === "RPI" ? "all" : current.boe,
+      sector: next !== "RPI" && current.sector === "housing" ? "all" : current.sector,
+      importIntensity: "all",
+      energyIntensity: "all",
+    }));
   };
 
   const moveMonth = (amount: number) => {
@@ -154,6 +188,8 @@ export default function ExplorerScreen() {
   const setSector = (sector: SectorView) => setFilters((current) => ({ ...current, sector }));
   const setCore = (core: CoreView) => setFilters((current) => ({ ...current, core }));
   const setBoe = (boe: BoeView) => setFilters((current) => ({ ...current, boe }));
+  const setImportIntensity = (importIntensity: ImportIntensityView) => setFilters((current) => ({ ...current, importIntensity }));
+  const setEnergyIntensity = (energyIntensity: EnergyIntensityView) => setFilters((current) => ({ ...current, energyIntensity }));
 
   return (
     <SafeAreaView edges={["top"]} style={[styles.safe, { backgroundColor: colors.canvas }]}>
@@ -319,11 +355,21 @@ export default function ExplorerScreen() {
                     ]} />
                   </FilterSection>
                 ) : null}
+                {series.classifications?.importIntensity ? (
+                  <FilterSection title="Import intensity" colors={colors}>
+                    <RadioGroup colors={colors} value={filters.importIntensity} onChange={setImportIntensity} options={availableImportOptions} />
+                  </FilterSection>
+                ) : null}
+                {series.classifications?.energyIntensity ? (
+                  <FilterSection title={series.classifications.energyIntensity === "cpi-derived" ? "Energy intensity (CPI-derived)" : "Energy intensity"} colors={colors}>
+                    <RadioGroup colors={colors} value={filters.energyIntensity} onChange={setEnergyIntensity} options={availableEnergyOptions} />
+                  </FilterSection>
+                ) : null}
                 <FilterSection title="Basket level" colors={colors}>
                   <RadioGroup colors={colors} value={level} onChange={setLevel} options={levelOptions(family)} />
                 </FilterSection>
                 <Pressable
-                  onPress={() => { setFilters({ sector: "all", core: "all", boe: "all" }); setLevel("all"); }}
+                  onPress={() => { setFilters({ sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all" }); setLevel("all"); }}
                   style={[styles.resetButton, { borderColor: colors.line }]}
                 >
                   <Text style={[styles.resetText, { color: colors.blue }]}>Reset all filters</Text>

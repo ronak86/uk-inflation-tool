@@ -17,7 +17,7 @@
     <meta name="twitter:image" content="https://chitroda.com/web/assets/inflation-preview.png" />
     <link rel="icon" href="web/assets/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="web/assets/favicon.png" type="image/png" />
-    <link rel="stylesheet" href="web/styles.css?v=mobile-desktop-grid-fix-1" />
+    <link rel="stylesheet" href="web/styles.css?v=measure-view-toolbar-2" />
   </head>
   <body>
     <section class="mobile-blocker" aria-label="Choose a mobile view">
@@ -120,12 +120,31 @@
             </div>
           </div>
 
-          <div class="control-group">
-            <span class="label">Measure</span>
-            <div class="radio-row vertical" role="radiogroup" aria-label="Measure">
-              <label><input type="radio" name="measure" value="contribution" data-measure="contribution" checked /> <span>Ctrb, bp</span></label>
-              <label><input type="radio" name="measure" value="price" data-measure="price" /> <span>Price Change, %</span></label>
-              <label><input type="radio" name="measure" value="weight" data-measure="weight" /> <span>Weight, %</span></label>
+          <div class="control-group" data-import-intensity-control>
+            <span class="label">Import Intensity</span>
+            <div class="radio-row vertical" role="radiogroup" aria-label="Import intensity">
+              <label><input type="radio" name="importIntensityView" value="all" data-import-intensity-view="all" checked /> <span>All</span></label>
+              <label data-import-intensity-option="0-10"><input type="radio" name="importIntensityView" value="0-10" data-import-intensity-view="0-10" /> <span>0-10%</span></label>
+              <label data-import-intensity-option="10-25"><input type="radio" name="importIntensityView" value="10-25" data-import-intensity-view="10-25" /> <span>10-25%</span></label>
+              <label data-import-intensity-option="25-40"><input type="radio" name="importIntensityView" value="25-40" data-import-intensity-view="25-40" /> <span>25-40%</span></label>
+              <label data-import-intensity-option="40-plus"><input type="radio" name="importIntensityView" value="40-plus" data-import-intensity-view="40-plus" /> <span>40% plus</span></label>
+              <label data-import-intensity-option="energy"><input type="radio" name="importIntensityView" value="energy" data-import-intensity-view="energy" /> <span>Energy</span></label>
+              <label data-import-intensity-option="ooh"><input type="radio" name="importIntensityView" value="ooh" data-import-intensity-view="ooh" /> <span>OOH</span></label>
+              <label data-import-intensity-option="unclassified"><input type="radio" name="importIntensityView" value="unclassified" data-import-intensity-view="unclassified" /> <span>Unclassified</span></label>
+            </div>
+          </div>
+
+          <div class="control-group" data-energy-intensity-control>
+            <span class="label" data-energy-intensity-label>Energy Intensity</span>
+            <div class="radio-row vertical" role="radiogroup" aria-label="Energy intensity">
+              <label><input type="radio" name="energyIntensityView" value="all" data-energy-intensity-view="all" checked /> <span>All</span></label>
+              <label data-energy-intensity-option="very-low"><input type="radio" name="energyIntensityView" value="very-low" data-energy-intensity-view="very-low" /> <span>Very Low</span></label>
+              <label data-energy-intensity-option="low"><input type="radio" name="energyIntensityView" value="low" data-energy-intensity-view="low" /> <span>Low</span></label>
+              <label data-energy-intensity-option="high"><input type="radio" name="energyIntensityView" value="high" data-energy-intensity-view="high" /> <span>High</span></label>
+              <label data-energy-intensity-option="very-high"><input type="radio" name="energyIntensityView" value="very-high" data-energy-intensity-view="very-high" /> <span>Very High</span></label>
+              <label data-energy-intensity-option="energy"><input type="radio" name="energyIntensityView" value="energy" data-energy-intensity-view="energy" /> <span>Energy</span></label>
+              <label data-energy-intensity-option="rents"><input type="radio" name="energyIntensityView" value="rents" data-energy-intensity-view="rents" /> <span>Rents</span></label>
+              <label data-energy-intensity-option="unclassified"><input type="radio" name="energyIntensityView" value="unclassified" data-energy-intensity-view="unclassified" /> <span>Unclassified</span></label>
             </div>
           </div>
 
@@ -165,6 +184,14 @@
           </div>
 
           <section class="panel active" id="explorerPanel">
+            <div class="explorer-view-toolbar">
+              <span class="explorer-view-label">View</span>
+              <div class="measure-segments" role="radiogroup" aria-label="Explorer view">
+                <label><input type="radio" name="measure" value="contribution" data-measure="contribution" checked /><span>Contribution, bp</span></label>
+                <label><input type="radio" name="measure" value="price" data-measure="price" /><span>Price Change, %</span></label>
+                <label><input type="radio" name="measure" value="weight" data-measure="weight" /><span>Weight, %</span></label>
+              </div>
+            </div>
             <div class="mobile-month-nav" aria-label="Choose month">
               <button type="button" id="mobileMonthPrevious" aria-label="Previous month">&#8249;</button>
               <label>
@@ -228,6 +255,8 @@
                   <ul>
                     <li>CPI, CPIH and RPI</li>
                     <li>Month-on-month and year-on-year views</li>
+                    <li>ONS import-intensity baskets for CPI and CPIH</li>
+                    <li>ONS energy-intensity baskets for CPI and CPI-derived CPIH classifications</li>
                     <li>Weights, price changes, and contribution estimates</li>
                     <li>Full basket drill-down from headline to item level</li>
                   </ul>
@@ -278,8 +307,8 @@
     <button class="mobile-view-return" id="mobileViewReturn" type="button">Mobile view</button>
     <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop"></div>
 
-    <script src="web/data/inflation-data.js?v=rename-inflation-1"></script>
-    <script src="web/app.js?v=latest-month-first-1"></script>
+    <script src="web/data/inflation-data.js?v=intensity-filters-1"></script>
+    <script src="web/app.js?v=intensity-filters-1"></script>
     <!-- Cloudflare Web Analytics -->
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "4377e92dc4aa4a8abcc0578fdf2fa15f"}'></script>
     <!-- End Cloudflare Web Analytics -->

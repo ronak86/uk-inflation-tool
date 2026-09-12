@@ -8,6 +8,8 @@ const state = {
   sectorView: "all",
   coreView: "all",
   boeView: "all",
+  importIntensityView: "all",
+  energyIntensityView: "all",
   timeRange: "1",
   levelView: "all",
   activeTab: "explorer",
@@ -281,6 +283,8 @@ function calcCacheKey() {
     state.sectorView,
     state.coreView,
     state.boeView,
+    state.importIntensityView,
+    state.energyIntensityView,
   ].join("|");
 }
 
@@ -342,6 +346,14 @@ function setIndexFamily(indexFamily) {
     state.sectorView = "all";
     checkRadio('[data-sector-view="all"]');
   }
+  if (!state.data.classifications?.importIntensity) {
+    state.importIntensityView = "all";
+    checkRadio('[data-import-intensity-view="all"]');
+  }
+  if (!state.data.classifications?.energyIntensity) {
+    state.energyIntensityView = "all";
+    checkRadio('[data-energy-intensity-view="all"]');
+  }
   if (Number(state.levelView) > maxSelectableLevel()) {
     state.levelView = "all";
     checkRadio('[data-level-view="all"]');
@@ -371,7 +383,20 @@ function leafItemsFor(item) {
 }
 
 function isSectorFiltered() {
-  return state.sectorView !== "all" || state.coreView !== "all" || (!isRpi() && state.boeView !== "all");
+  return state.sectorView !== "all"
+    || state.coreView !== "all"
+    || (!isRpi() && state.boeView !== "all")
+    || state.importIntensityView !== "all"
+    || state.energyIntensityView !== "all";
+}
+
+function intensityFilterValue(group) {
+  if (!group) return "unclassified";
+  return String(group)
+    .toLowerCase()
+    .replace("% plus", "-plus")
+    .replaceAll("%", "")
+    .replace(/\s+/g, "-");
 }
 
 function leafInActiveSectors(leaf) {
@@ -383,6 +408,10 @@ function leafInActiveSectors(leaf) {
   if (state.coreView === "core" && sectors.nonCore) return false;
   if (!isRpi() && state.boeView === "boe" && !sectors.boe) return false;
   if (!isRpi() && state.boeView === "exboe" && !sectors.exBoe) return false;
+  if (state.importIntensityView !== "all"
+    && intensityFilterValue(leaf.intensity?.import?.group) !== state.importIntensityView) return false;
+  if (state.energyIntensityView !== "all"
+    && intensityFilterValue(leaf.intensity?.energy?.group) !== state.energyIntensityView) return false;
   return true;
 }
 
@@ -430,6 +459,8 @@ function activeBasketName() {
   if (state.sectorView === "housing") parts.push("Housing");
   if (!isRpi() && state.boeView === "boe") parts.push("BoE Services");
   if (!isRpi() && state.boeView === "exboe") parts.push("ex BoE Services");
+  if (state.importIntensityView !== "all") parts.push(`${intensityDisplayLabel(state.importIntensityView)} Import Intensity`);
+  if (state.energyIntensityView !== "all") parts.push(`${intensityDisplayLabel(state.energyIntensityView)} Energy Intensity`);
   if (parts.length === 1) return getAllItems().name;
   return `${parts.join(" ")} index`;
 }
@@ -464,9 +495,33 @@ function boeDefinitionLabel(item) {
   return "";
 }
 
+function intensityDisplayLabel(value) {
+  const labels = {
+    "0-10": "0-10%",
+    "10-25": "10-25%",
+    "25-40": "25-40%",
+    "40-plus": "40% plus",
+    "very-low": "Very Low",
+    "very-high": "Very High",
+    low: "Low",
+    high: "High",
+    energy: "Energy",
+    rents: "Rents",
+    ooh: "OOH",
+    unclassified: "Unclassified",
+  };
+  return labels[value] || value;
+}
+
+function intensityDefinitionLabel(item, kind) {
+  return item.intensity?.[kind]?.group || "Unclassified";
+}
+
 function definitionColumnKeys(showBoeColumn) {
   const keys = ["name", "level", "weightCode", "priceCode", "sector", "core"];
   if (showBoeColumn) keys.push("boe");
+  if (state.data.classifications?.importIntensity) keys.push("importIntensity");
+  if (state.data.classifications?.energyIntensity) keys.push("energyIntensity");
   keys.push("latestWeight");
   return keys;
 }
@@ -1147,10 +1202,15 @@ function renderDefinitions() {
   if (state.sectorView !== "all") filterParts.push(state.sectorView === "housing" ? "Housing" : state.sectorView === "services" ? "Services" : "Goods");
   if (state.coreView !== "all") filterParts.push(state.coreView === "noncore" ? "Non Core" : "Core");
   if (showBoeColumn && state.boeView !== "all") filterParts.push(state.boeView === "boe" ? "BoE Services" : "All exc BoE Services");
+  if (state.importIntensityView !== "all") filterParts.push(`${intensityDisplayLabel(state.importIntensityView)} import intensity`);
+  if (state.energyIntensityView !== "all") filterParts.push(`${intensityDisplayLabel(state.energyIntensityView)} energy intensity`);
   const filterLabel = filterParts.length ? filterParts.join(", ") : "All definitions";
   const columnKeys = definitionColumnKeys(showBoeColumn);
-  const columnWidths = showBoeColumn
-    ? { name: 31, level: 6, weightCode: 10, priceCode: 10, sector: 10, core: 10, boe: 12, latestWeight: 11 }
+  const columnWidths = state.data.classifications?.importIntensity
+    ? {
+        name: 24, level: 5, weightCode: 8, priceCode: 8, sector: 8, core: 8,
+        boe: 10, importIntensity: 10, energyIntensity: 10, latestWeight: 9,
+      }
     : { name: 36, level: 7, weightCode: 12, priceCode: 12, sector: 12, core: 11, latestWeight: 10 };
 
   els.definitionsSummary.textContent = `${state.indexFamily}: ${rows.length} leaf definitions shown for ${filterLabel}.`;
@@ -1167,6 +1227,8 @@ function renderDefinitions() {
       ${definitionHeaderHtml("Sector", "sector")}
       ${definitionHeaderHtml("Core", "core")}
       ${showBoeColumn ? definitionHeaderHtml("BoE Services", "boe") : ""}
+      ${state.data.classifications?.importIntensity ? definitionHeaderHtml("Import Intensity", "importIntensity") : ""}
+      ${state.data.classifications?.energyIntensity ? definitionHeaderHtml("Energy Intensity", "energyIntensity") : ""}
       ${definitionHeaderHtml("Latest Weight, %", "latestWeight")}
     </tr>
   `;
@@ -1181,6 +1243,8 @@ function renderDefinitions() {
           <td class="definition-center-cell">${sectorDefinitionLabel(item)}</td>
           <td class="definition-center-cell">${coreDefinitionLabel(item)}</td>
           ${showBoeColumn ? `<td class="definition-center-cell">${boeDefinitionLabel(item)}</td>` : ""}
+          ${state.data.classifications?.importIntensity ? `<td class="definition-center-cell">${intensityDefinitionLabel(item, "import")}</td>` : ""}
+          ${state.data.classifications?.energyIntensity ? `<td class="definition-center-cell">${intensityDefinitionLabel(item, "energy")}</td>` : ""}
           <td class="definition-number-cell">${formatWeight(item.weights[latestMonthIndex])}</td>
         </tr>
       `,
@@ -1660,6 +1724,35 @@ function updateIndexSpecificControls() {
   document.querySelectorAll("[data-sector-option='housing']").forEach((node) => {
     node.hidden = !isRpiSeries;
   });
+  const importAvailable = Boolean(state.data.classifications?.importIntensity);
+  const energyAvailable = Boolean(state.data.classifications?.energyIntensity);
+  document.querySelectorAll("[data-import-intensity-control]").forEach((node) => {
+    node.hidden = !importAvailable;
+  });
+  document.querySelectorAll("[data-energy-intensity-control]").forEach((node) => {
+    node.hidden = !energyAvailable;
+  });
+  document.querySelectorAll("[data-energy-intensity-label]").forEach((node) => {
+    node.textContent = state.data.classifications?.energyIntensity === "cpi-derived"
+      ? "Energy Intensity (CPI-derived)"
+      : "Energy Intensity";
+  });
+
+  for (const kind of ["import", "energy"]) {
+    const available = new Set(
+      state.data.items
+        .filter((item) => item.level === leafLevel())
+        .map((item) => intensityFilterValue(item.intensity?.[kind]?.group)),
+    );
+    const stateKey = `${kind}IntensityView`;
+    if (state[stateKey] !== "all" && !available.has(state[stateKey])) {
+      state[stateKey] = "all";
+      checkRadio(`[data-${kind}-intensity-view="all"]`);
+    }
+    document.querySelectorAll(`[data-${kind}-intensity-option]`).forEach((node) => {
+      node.hidden = !available.has(node.dataset[`${kind}IntensityOption`]);
+    });
+  }
 }
 
 function selectExplorerTable() {
@@ -1822,6 +1915,24 @@ function bindEvents() {
         checkRadio('[data-sector-view="all"]');
         checkRadio('[data-core-view="all"]');
       }
+      state.sort = { type: "name", monthIndex: null };
+      state.selectedRowId = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-import-intensity-view]").forEach((button) => {
+    button.addEventListener("change", () => {
+      state.importIntensityView = button.dataset.importIntensityView;
+      state.sort = { type: "name", monthIndex: null };
+      state.selectedRowId = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-energy-intensity-view]").forEach((button) => {
+    button.addEventListener("change", () => {
+      state.energyIntensityView = button.dataset.energyIntensityView;
       state.sort = { type: "name", monthIndex: null };
       state.selectedRowId = null;
       render();

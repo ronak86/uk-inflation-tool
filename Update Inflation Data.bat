@@ -6,6 +6,7 @@ cd /d "%~dp0"
 set "BUNDLED_PYTHON=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
 set "DATA_JSON=web\data\inflation.json"
 set "DATA_JS=web\data\inflation-data.js"
+set "MOBILE_DATA=mobile\assets\data\inflation.json"
 
 if not exist "Weights And Prices.xlsx" (
   echo Could not find "Weights And Prices.xlsx" in:
@@ -21,8 +22,10 @@ echo This rebuilds:
 echo   - CPI, CPIH and RPI weights/prices
 echo   - 3dp headline overall indices
 echo   - Definitions flags: Services, Goods, RPI Housing, Non Core, BoE Measure
+echo   - ONS import-intensity and energy-intensity classifications
 echo   - %DATA_JSON%
 echo   - %DATA_JS%
+echo   - %MOBILE_DATA%
 echo.
 echo Then it commits and pushes those data files to GitHub Pages.
 echo.
@@ -58,7 +61,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-git add "%DATA_JSON%" "%DATA_JS%"
+git add "%DATA_JSON%" "%DATA_JS%" "%MOBILE_DATA%"
 if errorlevel 1 (
   echo.
   echo Could not stage the generated data files.
@@ -66,7 +69,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-git diff --cached --quiet -- "%DATA_JSON%" "%DATA_JS%"
+git diff --cached --quiet -- "%DATA_JSON%" "%DATA_JS%" "%MOBILE_DATA%"
 if not errorlevel 1 (
   echo.
   echo Data rebuilt successfully, but there are no changes to push.

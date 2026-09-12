@@ -4,6 +4,8 @@ export type Measure = "contribution" | "price" | "weight";
 export type SectorView = "all" | "services" | "goods" | "housing";
 export type CoreView = "all" | "core" | "noncore";
 export type BoeView = "all" | "boe" | "exboe";
+export type ImportIntensityView = "all" | "0-10" | "10-25" | "25-40" | "40-plus" | "energy" | "ooh" | "unclassified";
+export type EnergyIntensityView = "all" | "very-low" | "low" | "high" | "very-high" | "energy" | "rents" | "unclassified";
 
 export interface SectorFlags {
   boe: boolean;
@@ -21,6 +23,10 @@ export interface InflationItem {
   weights: Array<number | null>;
   prices: Array<number | null>;
   sectors: SectorFlags;
+  intensity?: {
+    import: { direct: number | null; total: number | null; group: string } | null;
+    energy: { rate: number | null; group: string } | null;
+  };
   id?: number;
   parentId?: number | null;
   children?: number[];
@@ -37,6 +43,10 @@ export interface InflationSeries {
   sourceWorkbook: string;
   months: string[];
   items: InflationItem[];
+  classifications?: {
+    importIntensity: "official" | null;
+    energyIntensity: "official" | "cpi-derived" | null;
+  };
   overall3dp?: OverallSeries;
 }
 
@@ -49,6 +59,8 @@ export interface FilterState {
   sector: SectorView;
   core: CoreView;
   boe: BoeView;
+  importIntensity: ImportIntensityView;
+  energyIntensity: EnergyIntensityView;
 }
 
 export interface ExplorerRow {

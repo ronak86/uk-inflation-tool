@@ -12,6 +12,20 @@ function codePrefix(name: string) {
   return (name.match(/^\s*(\d+(?:\.\d+)*)/) ?? [null, ""])[1];
 }
 
+function intensityFilterValue(group: string | null | undefined) {
+  if (!group) return "unclassified";
+  return group.toLowerCase().replace("% plus", "-plus").replaceAll("%", "").replace(/\s+/g, "-");
+}
+
+function intensityDisplayLabel(value: string) {
+  const labels: Record<string, string> = {
+    "0-10": "0-10%", "10-25": "10-25%", "25-40": "25-40%", "40-plus": "40% plus",
+    "very-low": "Very Low", "very-high": "Very High", low: "Low", high: "High",
+    energy: "Energy", rents: "Rents", ooh: "OOH", unclassified: "Unclassified",
+  };
+  return labels[value] ?? value;
+}
+
 export function prepareSeries(input: InflationSeries): InflationSeries {
   const items = input.items.map((item, id) => ({
     ...item,
@@ -50,7 +64,11 @@ export class InflationEngine {
   }
 
   get isFiltered() {
-    return this.filters.sector !== "all" || this.filters.core !== "all" || (!this.isRpi && this.filters.boe !== "all");
+    return this.filters.sector !== "all"
+      || this.filters.core !== "all"
+      || (!this.isRpi && this.filters.boe !== "all")
+      || this.filters.importIntensity !== "all"
+      || this.filters.energyIntensity !== "all";
   }
 
   allItems() {
@@ -75,6 +93,8 @@ export class InflationEngine {
     if (this.filters.sector === "housing") parts.push("Housing");
     if (!this.isRpi && this.filters.boe === "boe") parts.push("BoE Services");
     if (!this.isRpi && this.filters.boe === "exboe") parts.push("ex BoE Services");
+    if (this.filters.importIntensity !== "all") parts.push(`${intensityDisplayLabel(this.filters.importIntensity)} Import Intensity`);
+    if (this.filters.energyIntensity !== "all") parts.push(`${intensityDisplayLabel(this.filters.energyIntensity)} Energy Intensity`);
     return parts.length === 1 ? this.allItems().name : `${parts.join(" ")} index`;
   }
 
@@ -104,6 +124,10 @@ export class InflationEngine {
     if (this.filters.core === "noncore" && !flags.nonCore) return false;
     if (!this.isRpi && this.filters.boe === "boe" && !flags.boe) return false;
     if (!this.isRpi && this.filters.boe === "exboe" && !flags.exBoe) return false;
+    if (this.filters.importIntensity !== "all"
+      && intensityFilterValue(item.intensity?.import?.group) !== this.filters.importIntensity) return false;
+    if (this.filters.energyIntensity !== "all"
+      && intensityFilterValue(item.intensity?.energy?.group) !== this.filters.energyIntensity) return false;
     return true;
   }
 

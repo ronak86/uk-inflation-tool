@@ -32,7 +32,10 @@ https://github.com/ronak86/uk-inflation-tool
   Downloads the latest ONS detailed reference tables and updates `Weights And Prices.xlsx`.
 
 - `scripts/export_inflation_data.py`  
-  Converts `Weights And Prices.xlsx` into the generated web data files.
+  Converts `Weights And Prices.xlsx` into the generated web and mobile data files, attaching the ONS intensity classifications.
+
+- `scripts/data/ons-intensity-source/`
+  Auditable ONS source workbooks for CPI/CPIH import intensity and CPI energy intensity. CPIH energy classifications are derived from corresponding CPI COICOP classes; OOH and Council Tax remain unclassified. RPI has no intensity classification.
 
 - `.github/workflows/update-inflation-data.yml`  
   The GitHub Actions cloud scheduler.
@@ -65,10 +68,12 @@ On each scheduled run GitHub will:
 3. Update `Weights And Prices.xlsx`.
 4. Rebuild `web/data/inflation.json`.
 5. Rebuild `web/data/inflation-data.js`.
-6. Commit the changed workbook and generated data files.
-7. Push the commit to `main`.
-8. GitHub Pages updates the live website automatically.
-9. A notification email is sent when the update finishes successfully or fails.
+6. Rebuild `mobile/assets/data/inflation.json`.
+7. Validate the mobile calculation engine.
+8. Commit the changed workbook and generated data files.
+9. Push the commit to `main`.
+10. GitHub Pages updates the live website automatically.
+11. A notification email is sent when the update finishes successfully or fails.
 
 The PC does not need to be switched on for this cloud workflow to run.
 

@@ -36,7 +36,9 @@ export default function ErrorsScreen() {
   const [horizon, setHorizon] = useState<Horizon>("mom");
   const matrix = useMemo(() => {
     const series = prepareSeries(data.series[family]);
-    const engine = new InflationEngine(series, { sector: "all", core: "all", boe: "all" });
+    const engine = new InflationEngine(series, {
+      sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all",
+    });
     const leafLevel = family === "RPI" ? 3 : 4;
     const leaves = series.items.filter((item) => item.level === leafLevel);
     const values = new Map<string, number>();

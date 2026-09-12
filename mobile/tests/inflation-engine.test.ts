@@ -13,7 +13,9 @@ import {
 const data = payload as InflationPayload;
 const families: IndexFamily[] = ["CPI", "CPIH", "RPI"];
 const horizons: Horizon[] = ["mom", "yoy"];
-const allFilters: FilterState = { sector: "all", core: "all", boe: "all" };
+const allFilters: FilterState = {
+  sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all",
+};
 
 function engineFor(family: IndexFamily, filters = allFilters) {
   return new InflationEngine(prepareSeries(data.series[family]), filters);
@@ -114,6 +116,31 @@ describe("headline reconciliation", () => {
 });
 
 describe("classification partitions", () => {
+  it("publishes intensity filters only for supported index families", () => {
+    expect(data.series.CPI.classifications).toEqual({ importIntensity: "official", energyIntensity: "official" });
+    expect(data.series.CPIH.classifications).toEqual({ importIntensity: "official", energyIntensity: "cpi-derived" });
+    expect(data.series.RPI.classifications).toEqual({ importIntensity: null, energyIntensity: null });
+  });
+
+  it.each(["CPI", "CPIH"] as const)("%s assigns every leaf an official import-intensity group", (family) => {
+    const engine = engineFor(family);
+    const leaves = engine.data.items.filter((item) => item.level === engine.leafLevel);
+    expect(leaves.every((leaf) => Boolean(leaf.intensity?.import?.group))).toBe(true);
+  });
+
+  it("keeps CPIH energy-unclassified items as a calculable basket", () => {
+    const engine = engineFor("CPIH", { ...allFilters, energyIntensity: "unclassified" });
+    const leaves = engine.data.items.filter((item) => item.level === engine.leafLevel && !item.intensity?.energy);
+    const monthIndex = engine.data.months.length - 1;
+    expect(leaves.map((leaf) => leaf.name)).toEqual(expect.arrayContaining([
+      expect.stringContaining("Owner occupiers' housing costs"),
+      expect.stringContaining("Council Tax"),
+    ]));
+    expect(engine.value(engine.allItems(), monthIndex, "mom", "weight")).toBeGreaterThan(0);
+    expect(Number.isFinite(engine.value(engine.allItems(), monthIndex, "mom", "price"))).toBe(true);
+    expect(Number.isFinite(engine.value(engine.allItems(), monthIndex, "mom", "contribution"))).toBe(true);
+  });
+
   it.each(families)("%s core and non-core leaf weights reconstruct the full basket", (family) => {
     const all = engineFor(family);
     const core = engineFor(family, { ...allFilters, core: "core" });

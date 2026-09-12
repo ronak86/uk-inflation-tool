@@ -12,6 +12,18 @@ function category(value: boolean, yes: string, no: string) {
   return value ? yes : no;
 }
 
+function importLabel(item: ReturnType<typeof prepareSeries>["items"][number]) {
+  if (!item.intensity?.import) return "Import: Unclassified";
+  const rate = item.intensity.import.total;
+  return `Import: ${item.intensity.import.group}${rate == null ? "" : ` (${(rate * 100).toFixed(1)}%)`}`;
+}
+
+function energyLabel(item: ReturnType<typeof prepareSeries>["items"][number]) {
+  if (!item.intensity?.energy) return "Energy: Unclassified";
+  const rate = item.intensity.energy.rate;
+  return `Energy: ${item.intensity.energy.group}${rate == null ? "" : ` (${(rate * 100).toFixed(1)}%)`}`;
+}
+
 export default function DefinitionsScreen() {
   const colors = colorsFor(useColorScheme());
   const { data } = useAppData();
@@ -27,7 +39,7 @@ export default function DefinitionsScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.canvas }]}>
-      <ScreenHeader title="Definitions" subtitle="See how every most-granular basket item is classified.">
+      <ScreenHeader title="Definitions" subtitle={family === "CPIH" ? "Includes CPI-derived energy classifications; OOH and Council Tax are unclassified." : "See how every most-granular basket item is classified."}>
         <View style={styles.controls}>
           <SegmentedControl colors={colors} value={family} onChange={setFamily} options={[
             { label: "CPI", value: "CPI" }, { label: "CPIH", value: "CPIH" }, { label: "RPI", value: "RPI" },
@@ -65,6 +77,8 @@ export default function DefinitionsScreen() {
                 <Tag label={category(item.sectors.nonCore, "Non Core", "Core")} />
                 {family === "RPI" && item.sectors.housing ? <Tag label="Housing" /> : null}
                 {family !== "RPI" && item.sectors.boe ? <Tag label="BoE Services" /> : null}
+                {series.classifications?.importIntensity ? <Tag label={importLabel(item)} /> : null}
+                {series.classifications?.energyIntensity ? <Tag label={energyLabel(item)} /> : null}
               </View>
             </View>
           );
@@ -85,11 +99,11 @@ const styles = StyleSheet.create({
   search: { borderRadius: 7, borderWidth: 1, fontSize: 14, height: 38, paddingHorizontal: 11 },
   heading: { alignItems: "center", flexDirection: "row", minHeight: 29, paddingHorizontal: 12 },
   headingName: { color: "#FFFFFF", flex: 1, fontSize: 12, fontWeight: "800" },
-  headingMeta: { color: "#FFFFFF", fontSize: 12, fontWeight: "800", width: 132 },
+  headingMeta: { color: "#FFFFFF", fontSize: 12, fontWeight: "800", width: 158 },
   row: { alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", minHeight: 58, paddingHorizontal: 12, paddingVertical: 7 },
   nameBlock: { flex: 1, paddingRight: 8 },
   name: { fontSize: 12, lineHeight: 16 },
   codes: { fontSize: 10, marginTop: 3 },
-  tags: { alignItems: "flex-start", gap: 3, width: 132 },
+  tags: { alignItems: "flex-start", gap: 3, width: 158 },
   tag: { borderRadius: 4, fontSize: 10, overflow: "hidden", paddingHorizontal: 5, paddingVertical: 2 },
 });
