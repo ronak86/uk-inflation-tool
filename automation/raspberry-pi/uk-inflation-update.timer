@@ -1,8 +1,8 @@
 [Unit]
-Description=Check for a UK inflation release every day at 07:05 London time
+Description=Check for a UK inflation release every day at 07:00:10 London time
 
 [Timer]
-OnCalendar=*-*-* 07:05:00 Europe/London
+OnCalendar=*-*-* 07:00:10 Europe/London
 Persistent=true
 AccuracySec=1s
 RandomizedDelaySec=0

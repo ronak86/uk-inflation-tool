@@ -1,6 +1,6 @@
 # Raspberry Pi release trigger
 
-The Pi checks `automation/inflation-release-dates.txt` at 07:05 London time each day. On a listed date it dispatches the `Update inflation data` GitHub Action. GitHub remains responsible for downloading ONS data, rebuilding the app data, testing, committing, deploying and emailing the result.
+The Pi checks `automation/inflation-release-dates.txt` at 07:00:10 London time each day. On a listed date it dispatches the `Update inflation data` GitHub Action. GitHub remains responsible for downloading ONS data, rebuilding the app data, testing, committing, deploying and emailing the result.
 
 ## Token
 

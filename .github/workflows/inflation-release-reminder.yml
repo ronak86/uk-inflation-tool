@@ -51,4 +51,4 @@ jobs:
         run: |
           python scripts/send_notification_email.py \
             --subject "UK Inflation Tool will update tomorrow" \
-            --body "Inflation release is scheduled for ${{ steps.date-check.outputs.release_date }}. GitHub Actions will run the UK Inflation Tool update at 07:05 London time tomorrow morning. If ONS publishes late, run the workflow manually from GitHub Actions."
+            --body "Inflation release is scheduled for ${{ steps.date-check.outputs.release_date }}. The Raspberry Pi will trigger the UK Inflation Tool update at 07:00:10 London time tomorrow morning. GitHub will retry automatically if ONS publishes late."

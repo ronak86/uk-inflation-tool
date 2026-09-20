@@ -54,7 +54,7 @@ https://github.com/ronak86/uk-inflation-tool
 
 ## What Happens on GitHub
 
-The Raspberry Pi normally dispatches the GitHub workflow named `Update inflation data` at 07:05 London time. GitHub remains the worker: the Pi does not download or process the workbook itself.
+The Raspberry Pi normally dispatches the GitHub workflow named `Update inflation data` at 07:00:10 London time. GitHub remains the worker: the Pi does not download or process the workbook itself.
 
 Release dates are listed once in `automation/inflation-release-dates.txt`:
 
