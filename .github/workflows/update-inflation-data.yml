@@ -2,17 +2,24 @@ name: Update inflation data
 
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: Run even if the expected month is already live
+        required: false
+        type: boolean
+        default: false
+      trigger_source:
+        description: Where this dispatch came from
+        required: false
+        type: string
+        default: manual
   schedule:
-    # GitHub cron is UTC. July to October release times are 07:05 London / 06:05 UTC.
-    - cron: "5 6 22 7 *"
-    - cron: "5 6 19 8 *"
-    - cron: "5 6 16 9 *"
-    - cron: "5 6 21 10 *"
-    # November to February release times are 07:05 London / 07:05 UTC.
-    - cron: "5 7 18 11 *"
-    - cron: "5 7 16 12 *"
-    - cron: "5 7 20 1 *"
-    - cron: "5 7 17 2 *"
+    # Daily late backup. The release-date file and duplicate guard make other days no-ops.
+    - cron: "30 8 * * *"
+
+concurrency:
+  group: update-inflation-data
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -22,27 +29,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check release date
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Check release date and current data
         id: date-check
         shell: bash
+        env:
+          FORCE_UPDATE: ${{ inputs.force }}
+          TRIGGER_SOURCE: ${{ inputs.trigger_source }}
         run: |
           today="$(TZ=Europe/London date +%Y-%m-%d)"
-          case "$today" in
-            2026-07-22|2026-08-19|2026-09-16|2026-10-21|2026-11-18|2026-12-16|2027-01-20|2027-02-17)
-              echo "run_update=true" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                echo "run_update=true" >> "$GITHUB_OUTPUT"
-              else
-                echo "run_update=false" >> "$GITHUB_OUTPUT"
-              fi
-              ;;
-          esac
+          expected_month="$(TZ=Europe/London date -d "${today} -1 month" +%Y-%m)"
+          latest_month="$(python -c 'import json; print(json.load(open("web/data/inflation.json"))["series"]["CPI"]["months"][-1])')"
+          is_release=false
+          if grep --fixed-strings --line-regexp --quiet "$today" automation/inflation-release-dates.txt; then
+            is_release=true
+          fi
 
-      - name: Check out repo
-        if: steps.date-check.outputs.run_update == 'true'
-        uses: actions/checkout@v4
+          echo "release_date=$today" >> "$GITHUB_OUTPUT"
+          echo "expected_month=$expected_month" >> "$GITHUB_OUTPUT"
+          echo "latest_month=$latest_month" >> "$GITHUB_OUTPUT"
+          echo "trigger_source=${TRIGGER_SOURCE:-${{ github.event_name }}}" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$is_release" != "true" ]; then
+            echo "run_update=false" >> "$GITHUB_OUTPUT"
+            echo "Today is not listed as a release date."
+          elif [ "${FORCE_UPDATE:-false}" != "true" ] && [[ "$latest_month" > "$expected_month" || "$latest_month" == "$expected_month" ]]; then
+            echo "run_update=false" >> "$GITHUB_OUTPUT"
+            echo "The expected month $expected_month is already live; skipping duplicate run."
+          else
+            echo "run_update=true" >> "$GITHUB_OUTPUT"
+            echo "Updating from $latest_month to expected month $expected_month."
+          fi
 
       - name: Set up Python
         if: steps.date-check.outputs.run_update == 'true'
@@ -71,9 +90,35 @@ jobs:
         working-directory: mobile
         run: pnpm install --frozen-lockfile
 
-      - name: Download ONS workbook and update source workbook
+      - name: Wait for ONS workbook and update source workbook
         if: steps.date-check.outputs.run_update == 'true'
-        run: python -u scripts/update_workbook_from_ons.py --download
+        env:
+          EXPECTED_MONTH: ${{ steps.date-check.outputs.expected_month }}
+        shell: bash
+        run: |
+          max_attempts=16
+          for attempt in $(seq 1 "$max_attempts"); do
+            echo "ONS publication check ${attempt}/${max_attempts} for ${EXPECTED_MONTH}"
+            set +e
+            python -u scripts/update_workbook_from_ons.py \
+              --download \
+              --expected-month "$EXPECTED_MONTH" \
+              --no-backup
+            status=$?
+            set -e
+
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            if [ "$status" -ne 75 ]; then
+              exit "$status"
+            fi
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "ONS did not publish ${EXPECTED_MONTH} within the retry window." >&2
+              exit 1
+            fi
+            sleep 120
+          done
 
       - name: Rebuild website data
         if: steps.date-check.outputs.run_update == 'true'
@@ -115,7 +160,7 @@ jobs:
         run: |
           python scripts/send_notification_email.py \
             --subject "UK Inflation Tool website updated" \
-            --body "The scheduled UK Inflation Tool update has finished successfully. Data changes committed: ${{ steps.commit-push.outputs.changed }}. Live site: https://chitroda.com/inflation.html"
+            --body "The UK Inflation Tool update triggered by ${{ steps.date-check.outputs.trigger_source }} has finished successfully for ${{ steps.date-check.outputs.expected_month }}. Data changes committed: ${{ steps.commit-push.outputs.changed }}. Live site: https://chitroda.com/inflation.html"
 
       - name: Send failure email
         if: steps.date-check.outputs.run_update == 'true' && failure()

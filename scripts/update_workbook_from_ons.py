@@ -52,6 +52,10 @@ OVERALL_3DP = {
 }
 
 
+class ReleaseNotReadyError(RuntimeError):
+    """The ONS current workbook does not yet contain the expected release month."""
+
+
 def clean(value: Any) -> Any:
     if isinstance(value, str):
         return value.strip()
@@ -79,6 +83,13 @@ def month_key(value: Any) -> str:
     if isinstance(value, datetime):
         return value.strftime("%Y-%m")
     raise ValueError(f"Expected month header date, got {value!r}")
+
+
+def parse_iso_month(value: str) -> datetime:
+    try:
+        return datetime.strptime(value, "%Y-%m")
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected month must use YYYY-MM") from exc
 
 
 def parse_weight_header(value: Any) -> tuple[int, str]:
@@ -187,6 +198,20 @@ def read_3dp_overall(raw_wb, code: str) -> tuple[datetime, float]:
     if latest_month is None or latest_value is None:
         raise ValueError(f"Could not read latest {code} value from {sheet.title}")
     return latest_month, latest_value
+
+
+def source_latest_months(raw_wb) -> dict[str, str]:
+    months = {
+        series: read_latest_price_series(
+            raw_wb,
+            config["price_table"],
+            config["price_start_row"],
+        )[0].strftime("%Y-%m")
+        for series, config in SERIES_CONFIG.items()
+    }
+    for code in OVERALL_3DP:
+        months[f"3dp:{code}"] = read_3dp_overall(raw_wb, code)[0].strftime("%Y-%m")
+    return months
 
 
 def copy_column_style(sheet, source_col: int, target_col: int) -> None:
@@ -339,6 +364,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, help="Optional output workbook. Defaults to updating --workbook in place.")
     parser.add_argument("--no-backup", action="store_true", help="Do not create a timestamped backup when updating in place.")
     parser.add_argument("--allow-missing", action="store_true", help="Save even if some workbook codes are missing in the ONS file.")
+    parser.add_argument(
+        "--expected-month",
+        type=parse_iso_month,
+        help="Require the ONS workbook to contain this YYYY-MM month; exit 75 while it is not yet published.",
+    )
     args = parser.parse_args()
 
     if args.download:
@@ -355,6 +385,20 @@ def main() -> int:
 
     print(f"Opening ONS workbook: {ons_path}", flush=True)
     raw_wb = load_workbook(ons_path, read_only=True, data_only=True)
+    source_months = source_latest_months(raw_wb)
+    print(
+        "ONS latest months: "
+        + ", ".join(f"{name}={month}" for name, month in source_months.items()),
+        flush=True,
+    )
+    if args.expected_month:
+        expected = args.expected_month.strftime("%Y-%m")
+        mismatches = {name: month for name, month in source_months.items() if month != expected}
+        if mismatches:
+            found = ", ".join(f"{name}={month}" for name, month in mismatches.items())
+            raise ReleaseNotReadyError(
+                f"ONS release {expected} is not ready yet ({found})"
+            )
     print(f"Opening curated workbook: {args.workbook}", flush=True)
     workbook = load_workbook(args.workbook)
 
@@ -395,6 +439,9 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
+    except ReleaseNotReadyError as exc:
+        print(f"WAITING: {exc}", file=sys.stderr)
+        raise SystemExit(75)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         raise SystemExit(1)

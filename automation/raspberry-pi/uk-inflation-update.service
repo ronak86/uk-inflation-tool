@@ -1,0 +1,13 @@
+[Unit]
+Description=Trigger the UK Inflation GitHub update on release dates
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ronakpi
+Group=ronakpi
+ExecStart=/usr/local/bin/trigger-uk-inflation-update
+
+[Install]
+WantedBy=multi-user.target

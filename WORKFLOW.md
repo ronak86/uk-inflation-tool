@@ -37,8 +37,14 @@ https://github.com/ronak86/uk-inflation-tool
 - `scripts/data/ons-intensity-source/`
   Auditable ONS source workbooks for CPI/CPIH import intensity and CPI energy intensity. CPIH energy classifications are derived from corresponding CPI COICOP classes; OOH and Council Tax remain unclassified. RPI has no intensity classification.
 
+- `automation/inflation-release-dates.txt`
+  The single list of ONS release dates used by the Pi trigger, GitHub backup and reminder.
+
+- `automation/raspberry-pi/`
+  The Pi trigger script, systemd service/timer and setup notes.
+
 - `.github/workflows/update-inflation-data.yml`  
-  The GitHub Actions cloud scheduler.
+  The GitHub Actions update worker and delayed cloud backup.
 
 - `.github/workflows/inflation-release-reminder.yml`  
   Sends a notification at 21:00 London time the night before each scheduled release.
@@ -48,9 +54,9 @@ https://github.com/ronak86/uk-inflation-tool
 
 ## What Happens on GitHub
 
-GitHub Actions runs the workflow named `Update inflation data`.
+The Raspberry Pi normally dispatches the GitHub workflow named `Update inflation data` at 07:05 London time. GitHub remains the worker: the Pi does not download or process the workbook itself.
 
-It is scheduled for the ONS release dates at 07:05 London time:
+Release dates are listed once in `automation/inflation-release-dates.txt`:
 
 - 22 July 2026
 - 19 August 2026
@@ -61,21 +67,22 @@ It is scheduled for the ONS release dates at 07:05 London time:
 - 20 January 2027
 - 17 February 2027
 
-On each scheduled run GitHub will:
+On each dispatched run GitHub will:
 
 1. Check that the current London date is one of the expected release dates.
-2. Download the latest ONS detailed reference tables workbook.
-3. Update `Weights And Prices.xlsx`.
-4. Rebuild `web/data/inflation.json`.
-5. Rebuild `web/data/inflation-data.js`.
-6. Rebuild `mobile/assets/data/inflation.json`.
-7. Validate the mobile calculation engine.
-8. Commit the changed workbook and generated data files.
-9. Push the commit to `main`.
-10. GitHub Pages updates the live website automatically.
-11. A notification email is sent when the update finishes successfully or fails.
+2. Skip the run if the expected month is already live.
+3. Download the latest ONS detailed reference tables workbook.
+4. If ONS is late, retry every two minutes for up to 30 minutes.
+5. Update `Weights And Prices.xlsx` only after all required ONS tables contain the expected month.
+6. Rebuild `web/data/inflation.json` and `web/data/inflation-data.js`.
+7. Rebuild `mobile/assets/data/inflation.json`.
+8. Validate the mobile calculation engine.
+9. Commit the changed workbook and generated data files.
+10. Push the commit to `main`.
+11. GitHub Pages updates the live website automatically.
+12. A notification email is sent when the update finishes successfully or fails.
 
-The PC does not need to be switched on for this cloud workflow to run.
+GitHub also checks every day at 08:30 UTC as a later backup. Non-release dates and already-completed releases are no-ops. The PC does not need to be switched on.
 
 ## Notifications
 
@@ -115,7 +122,7 @@ The local folder is still useful for development and manual updates.
 - Double-click `Update Inflation Data.bat` to rebuild the web data, commit it, and push it.
 - Double-click `Schedule Inflation Updates.bat` only if you want to recreate the old Windows Task Scheduler jobs.
 
-The Windows scheduled tasks have been disabled so GitHub Actions is the main automatic updater.
+The Windows scheduled tasks remain disabled. The Raspberry Pi is the precise scheduler and GitHub Actions is the update worker and backup.
 
 ## Local Clutter
 

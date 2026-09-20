@@ -3,46 +3,35 @@ name: Inflation release reminder
 on:
   workflow_dispatch:
   schedule:
-    # GitHub cron is UTC. July to October reminders are 21:00 London / 20:00 UTC.
-    - cron: "0 20 21 7 *"
-    - cron: "0 20 18 8 *"
-    - cron: "0 20 15 9 *"
-    - cron: "0 20 20 10 *"
-    # November to February reminders are 21:00 London / 21:00 UTC.
-    - cron: "0 21 17 11 *"
-    - cron: "0 21 15 12 *"
-    - cron: "0 21 19 1 *"
-    - cron: "0 21 16 2 *"
+    # One of these is 21:00 London time. The job checks the local hour and tomorrow's date.
+    - cron: "0 20 * * *"
+    - cron: "0 21 * * *"
 
 jobs:
   reminder:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
       - name: Check reminder date
         id: date-check
         shell: bash
         run: |
           today="$(TZ=Europe/London date +%Y-%m-%d)"
           tomorrow="$(TZ=Europe/London date -d 'tomorrow' +%Y-%m-%d)"
-          case "$today" in
-            2026-07-21|2026-08-18|2026-09-15|2026-10-20|2026-11-17|2026-12-15|2027-01-19|2027-02-16)
-              echo "send_reminder=true" >> "$GITHUB_OUTPUT"
-              echo "release_date=$tomorrow" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                echo "send_reminder=true" >> "$GITHUB_OUTPUT"
-                echo "release_date=$tomorrow" >> "$GITHUB_OUTPUT"
-              else
-                echo "send_reminder=false" >> "$GITHUB_OUTPUT"
-              fi
-              ;;
-          esac
-
-      - name: Check out repo
-        if: steps.date-check.outputs.send_reminder == 'true'
-        uses: actions/checkout@v4
+          london_hour="$(TZ=Europe/London date +%H)"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "send_reminder=true" >> "$GITHUB_OUTPUT"
+            echo "release_date=$tomorrow" >> "$GITHUB_OUTPUT"
+          elif [ "$london_hour" = "21" ] && grep --fixed-strings --line-regexp --quiet "$tomorrow" automation/inflation-release-dates.txt; then
+            echo "send_reminder=true" >> "$GITHUB_OUTPUT"
+            echo "release_date=$tomorrow" >> "$GITHUB_OUTPUT"
+          else
+            echo "send_reminder=false" >> "$GITHUB_OUTPUT"
+            echo "No 21:00 London reminder is due after ${today}."
+          fi
 
       - name: Set up Python
         if: steps.date-check.outputs.send_reminder == 'true'

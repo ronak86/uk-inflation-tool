@@ -1,0 +1,10 @@
+# UK CPI publication dates, one ISO date per line.
+# Add future dates here; both the Pi trigger and GitHub backup read this file.
+2026-07-22
+2026-08-19
+2026-09-16
+2026-10-21
+2026-11-18
+2026-12-16
+2027-01-20
+2027-02-17
