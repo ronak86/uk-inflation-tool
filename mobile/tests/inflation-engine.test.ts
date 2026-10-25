@@ -117,9 +117,9 @@ describe("headline reconciliation", () => {
 
 describe("classification partitions", () => {
   it("publishes intensity filters only for supported index families", () => {
-    expect(data.series.CPI.classifications).toEqual({ importIntensity: "official", energyIntensity: "official" });
-    expect(data.series.CPIH.classifications).toEqual({ importIntensity: "official", energyIntensity: "cpi-derived" });
-    expect(data.series.RPI.classifications).toEqual({ importIntensity: null, energyIntensity: null });
+    expect(data.series.CPI.classifications).toEqual({ importIntensity: "official", energyIntensity: "official", rcWeighting: "official" });
+    expect(data.series.CPIH.classifications).toEqual({ importIntensity: "official", energyIntensity: "cpi-derived", rcWeighting: null });
+    expect(data.series.RPI.classifications).toEqual({ importIntensity: null, energyIntensity: null, rcWeighting: null });
   });
 
   it.each(["CPI", "CPIH"] as const)("%s assigns every leaf an official import-intensity group", (family) => {
@@ -193,6 +193,28 @@ describe("classification partitions", () => {
         expect(leaf.sectors.exBoe).toBe(false);
       }
     }
+  });
+});
+
+describe("Bank of England rigid-central CPI", () => {
+  const rc = new InflationEngine(prepareSeries(data.series.CPI), allFilters, "rc");
+
+  it("publishes 84 fixed groups whose weights sum to 100%", () => {
+    expect(rc.data.rcGroups).toHaveLength(84);
+    expect(rc.data.rcGroups!.reduce((sum, group) => sum + group.weight, 0)).toBeCloseTo(1, 12);
+    expect(rc.value(rc.allItems(), rc.data.months.length - 1, "yoy", "weight")).toBeCloseTo(1000, 8);
+  });
+
+  it("reproduces the Bank's August 2026 3.3% chart value", () => {
+    const august = rc.data.months.indexOf("2026-08");
+    expect(rc.value(rc.allItems(), august, "yoy", "price")).toBeCloseTo(3.288729, 5);
+  });
+
+  it("gives Package holidays zero RC weight and exposes no Level 4 rows", () => {
+    const august = rc.data.months.indexOf("2026-08");
+    const packageHolidays = rc.data.items.find((item) => item.level === 3 && item.name.startsWith("09.6 "))!;
+    expect(rc.value(packageHolidays, august, "yoy", "weight")).toBe(0);
+    expect(rc.visibleAtLevel(4)).toEqual([]);
   });
 });
 

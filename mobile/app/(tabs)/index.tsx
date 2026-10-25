@@ -29,6 +29,7 @@ import {
   InflationItem,
   Measure,
   SectorView,
+  Weighting,
 } from "@/src/types";
 
 const importIntensityOptions: Array<{ label: string; value: ImportIntensityView }> = [
@@ -60,10 +61,10 @@ function measureLabel(measure: Measure) {
   return "Weight, %";
 }
 
-function levelOptions(family: IndexFamily) {
+function levelOptions(family: IndexFamily, weighting: Weighting) {
   const names = family === "RPI"
     ? ["Broad Groups", "Groups", "Sections"]
-    : ["Divisions", "Groups", "Classes", "Sub Classes"];
+    : weighting === "rc" ? ["Divisions", "Groups", "Classes"] : ["Divisions", "Groups", "Classes", "Sub Classes"];
   return [
     { label: "All levels", value: "all" },
     ...names.map((name, index) => ({ label: `Level ${index + 1} (${name})`, value: String(index + 1) })),
@@ -72,6 +73,7 @@ function levelOptions(family: IndexFamily) {
 
 function visibleTreeItems(engine: InflationEngine, expanded: Set<number>) {
   return engine.data.items.filter((item) => {
+    if (engine.weighting === "rc" && item.level > 3) return false;
     if (engine.isFiltered && item.level > 0 && engine.activeLeavesFor(item).length === 0) return false;
     if (item.level === 0) return true;
     let parentId = item.parentId;
@@ -89,6 +91,7 @@ export default function ExplorerScreen() {
   const [family, setFamily] = useState<IndexFamily>("CPI");
   const [horizon, setHorizon] = useState<Horizon>("mom");
   const [measure, setMeasure] = useState<Measure>("contribution");
+  const [weighting, setWeighting] = useState<Weighting>("official");
   const [filters, setFilters] = useState<FilterState>({
     sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all",
   });
@@ -100,7 +103,7 @@ export default function ExplorerScreen() {
   const [sortDirection, setSortDirection] = useState<"none" | "asc" | "desc">("none");
 
   const series = useMemo(() => prepareSeries(data.series[family]), [data, family]);
-  const engine = useMemo(() => new InflationEngine(series, filters), [series, filters]);
+  const engine = useMemo(() => new InflationEngine(series, filters, weighting), [series, filters, weighting]);
   const availableImportOptions = useMemo(() => {
     const values = new Set(series.items.filter((item) => item.level === 4).map((item) => intensityFilterValue(item.intensity?.import?.group)));
     return importIntensityOptions.filter((option) => option.value === "all" || values.has(option.value));
@@ -116,7 +119,7 @@ export default function ExplorerScreen() {
     const makeRow = (item: InflationItem) => ({
       item,
       value: engine.value(item, monthIndex, horizon, measure),
-      hasChildren: Boolean(item.children?.length),
+      hasChildren: Boolean(item.children?.length) && (weighting !== "rc" || item.level < 3),
     });
     const compareRows = (left: ReturnType<typeof makeRow>, right: ReturnType<typeof makeRow>) => {
       const leftFinite = Number.isFinite(left.value);
@@ -132,7 +135,7 @@ export default function ExplorerScreen() {
     };
 
     if (search) {
-      return sortRows(engine.data.items.filter((item) => engine.displayName(item).toLowerCase().includes(search)));
+      return sortRows(engine.data.items.filter((item) => (weighting !== "rc" || item.level <= 3) && engine.displayName(item).toLowerCase().includes(search)));
     }
 
     if (level !== "all") {
@@ -145,6 +148,7 @@ export default function ExplorerScreen() {
 
     const output: ReturnType<typeof makeRow>[] = [];
     const visit = (item: InflationItem) => {
+      if (weighting === "rc" && item.level > 3) return;
       if (engine.isFiltered && item.level > 0 && engine.activeLeavesFor(item).length === 0) return;
       output.push(makeRow(item));
       if (!expanded.has(item.id!)) return;
@@ -153,12 +157,13 @@ export default function ExplorerScreen() {
     };
     visit(engine.allItems());
     return output;
-  }, [engine, expanded, horizon, level, measure, monthIndex, query, sortDirection]);
+  }, [engine, expanded, horizon, level, measure, monthIndex, query, sortDirection, weighting]);
 
   const updateFamily = (next: IndexFamily) => {
     setFamily(next);
     setExpanded(new Set([0]));
     setLevel("all");
+    if (next !== "CPI") setWeighting("official");
     setFilters((current) => ({
       ...current,
       boe: next === "RPI" ? "all" : current.boe,
@@ -166,6 +171,16 @@ export default function ExplorerScreen() {
       importIntensity: "all",
       energyIntensity: "all",
     }));
+  };
+
+  const updateWeighting = (next: Weighting) => {
+    setWeighting(next);
+    setExpanded(new Set([0]));
+    setLevel("all");
+    setSortDirection("none");
+    if (next === "rc") {
+      setFilters({ sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all" });
+    }
   };
 
   const moveMonth = (amount: number) => {
@@ -212,6 +227,17 @@ export default function ExplorerScreen() {
           { label: "CPIH", value: "CPIH" },
           { label: "RPI", value: "RPI" },
         ]} />
+        {family === "CPI" ? (
+          <View style={styles.weightingRow}>
+            <Text style={[styles.weightingLabel, { color: colors.muted }]}>WEIGHTING</Text>
+            <View style={styles.weightingControl}>
+              <SegmentedControl compact colors={colors} selectedColor={colors.amber} selectedTextColor="#17202A" value={weighting} onChange={updateWeighting} options={[
+                { label: "Official CPI", value: "official" },
+                { label: "Rigid-central", value: "rc" },
+              ]} />
+            </View>
+          </View>
+        ) : null}
         <View style={styles.controlRow}>
           <View style={styles.controlHalf}>
             <SegmentedControl compact colors={colors} value={horizon} onChange={setHorizon} options={[
@@ -293,7 +319,7 @@ export default function ExplorerScreen() {
                 styles.dataRow,
                 {
                   backgroundColor: headline
-                    ? colors.blue
+                    ? weighting === "rc" ? "#8A4F08" : colors.blue
                     : index % 2 === 0 ? colors.panel : colors.blueLight,
                   borderBottomColor: colors.line,
                   paddingLeft: 10 + Math.min(row.item.level, 4) * 12,
@@ -336,7 +362,12 @@ export default function ExplorerScreen() {
             keyExtractor={(item) => item}
             renderItem={() => (
               <View style={styles.filterContent}>
-                <FilterSection title="Sector" colors={colors}>
+                {weighting === "rc" ? (
+                  <View style={[styles.rcNotice, { backgroundColor: colors.panel, borderColor: colors.amber }]}>
+                    <Text style={[styles.rcNoticeTitle, { color: colors.ink }]}>Rigid-central uses the full CPI basket</Text>
+                    <Text style={[styles.rcNoticeText, { color: colors.muted }]}>The Bank publishes RC weights at class level, so sector and intensity filters are unavailable in this view.</Text>
+                  </View>
+                ) : <><FilterSection title="Sector" colors={colors}>
                   <RadioGroup colors={colors} value={filters.sector} onChange={setSector} options={family === "RPI" ? [
                     { label: "All", value: "all" }, { label: "Services", value: "services" }, { label: "Goods", value: "goods" }, { label: "Housing", value: "housing" },
                   ] : [
@@ -365,8 +396,9 @@ export default function ExplorerScreen() {
                     <RadioGroup colors={colors} value={filters.energyIntensity} onChange={setEnergyIntensity} options={availableEnergyOptions} />
                   </FilterSection>
                 ) : null}
+                </>}
                 <FilterSection title="Basket level" colors={colors}>
-                  <RadioGroup colors={colors} value={level} onChange={setLevel} options={levelOptions(family)} />
+                  <RadioGroup colors={colors} value={level} onChange={setLevel} options={levelOptions(family, weighting)} />
                 </FilterSection>
                 <Pressable
                   onPress={() => { setFilters({ sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all" }); setLevel("all"); }}
@@ -401,6 +433,9 @@ const styles = StyleSheet.create({
   filterButton: { alignItems: "center", borderRadius: 7, borderWidth: 1, flexDirection: "row", gap: 5, minHeight: 36, paddingHorizontal: 10 },
   filterText: { fontSize: 13, fontWeight: "800" },
   controlRow: { flexDirection: "row", gap: 8 },
+  weightingRow: { alignItems: "center", flexDirection: "row", gap: 8 },
+  weightingLabel: { fontSize: 10, fontWeight: "800" },
+  weightingControl: { flex: 1 },
   controlHalf: { flex: 0.72 },
   controlMeasure: { flex: 1.28 },
   monthRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
@@ -429,6 +464,9 @@ const styles = StyleSheet.create({
   filterContent: { gap: 10, padding: 14, paddingBottom: 40 },
   filterSection: { borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, padding: 12 },
   filterHeading: { fontSize: 11, fontWeight: "800", marginBottom: 5 },
+  rcNotice: { borderRadius: 8, borderWidth: 1, padding: 12 },
+  rcNoticeTitle: { fontSize: 14, fontWeight: "800", marginBottom: 4 },
+  rcNoticeText: { fontSize: 12, lineHeight: 17 },
   resetButton: { alignItems: "center", borderRadius: 8, borderWidth: 1, marginTop: 4, padding: 13 },
   resetText: { fontSize: 14, fontWeight: "800" },
 });

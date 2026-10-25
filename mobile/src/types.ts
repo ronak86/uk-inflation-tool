@@ -1,6 +1,7 @@
 export type IndexFamily = "CPI" | "CPIH" | "RPI";
 export type Horizon = "mom" | "yoy";
 export type Measure = "contribution" | "price" | "weight";
+export type Weighting = "official" | "rc";
 export type SectorView = "all" | "services" | "goods" | "housing";
 export type CoreView = "all" | "core" | "noncore";
 export type BoeView = "all" | "boe" | "exboe";
@@ -46,7 +47,15 @@ export interface InflationSeries {
   classifications?: {
     importIntensity: "official" | null;
     energyIntensity: "official" | "cpi-derived" | null;
+    rcWeighting: "official" | null;
   };
+  rcGroups?: Array<{
+    code: string;
+    name: string;
+    weight: number;
+    memberCodes: string[];
+    members: string[];
+  }>;
   overall3dp?: OverallSeries;
 }
 

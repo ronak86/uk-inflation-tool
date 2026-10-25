@@ -4,6 +4,7 @@ import {
   InflationItem,
   InflationSeries,
   Measure,
+  Weighting,
 } from "@/src/types";
 
 const finite = (value: number | null | undefined): value is number => Number.isFinite(value);
@@ -47,12 +48,14 @@ export class InflationEngine {
   readonly data: InflationSeries;
   readonly filters: FilterState;
   readonly leafLevel: number;
+  readonly weighting: Weighting;
   private readonly contributionCache = new Map<string, number>();
   private readonly activeLeavesCache: InflationItem[];
 
-  constructor(data: InflationSeries, filters: FilterState) {
+  constructor(data: InflationSeries, filters: FilterState, weighting: Weighting = "official") {
     this.data = data.items[0]?.id === undefined ? prepareSeries(data) : data;
     this.filters = filters;
+    this.weighting = data.series === "CPI" ? weighting : "official";
     this.leafLevel = Math.max(...this.data.items.map((item) => item.level));
     this.activeLeavesCache = this.data.items
       .filter((item) => item.level === this.leafLevel)
@@ -64,6 +67,7 @@ export class InflationEngine {
   }
 
   get isFiltered() {
+    if (this.weighting === "rc") return false;
     return this.filters.sector !== "all"
       || this.filters.core !== "all"
       || (!this.isRpi && this.filters.boe !== "all")
@@ -85,6 +89,7 @@ export class InflationEngine {
   }
 
   activeBasketName() {
+    if (this.weighting === "rc") return "CPI Rigid-central index";
     const parts: string[] = [this.data.series];
     if (this.filters.core === "core") parts.push("Core");
     if (this.filters.core === "noncore") parts.push("Non Core");
@@ -103,6 +108,11 @@ export class InflationEngine {
   }
 
   value(item: InflationItem, monthIndex: number, horizon: Horizon, measure: Measure) {
+    if (this.weighting === "rc") {
+      if (measure === "contribution") return this.rcContribution(item, monthIndex, horizon);
+      if (measure === "weight") return this.rcWeightValue(item, monthIndex);
+      return this.rcPriceValue(item, monthIndex, horizon);
+    }
     if (measure === "contribution") return this.contribution(item, monthIndex, horizon);
     if (measure === "weight") return this.weightValue(item, monthIndex);
     return this.priceValue(item, monthIndex, horizon);
@@ -153,6 +163,7 @@ export class InflationEngine {
   }
 
   visibleAtLevel(level: number) {
+    if (this.weighting === "rc" && level > 3) return [];
     if (level === 0) return [this.allItems()];
     return this.data.items
       .filter((item) => item.level === level)
@@ -175,6 +186,50 @@ export class InflationEngine {
     const current = item.prices[monthIndex];
     const previous = item.prices[monthIndex - lag];
     return finite(current) && finite(previous) ? (current / previous - 1) * 100 : Number.NaN;
+  }
+
+  private rcClassesFor(item: InflationItem) {
+    if (item.level === 3) return [item];
+    if (item.level > 3) return [];
+    return item.level === 0
+      ? this.data.items.filter((candidate) => candidate.level === 3)
+      : this.descendantsAtLevel(item, 3);
+  }
+
+  private rcGroupFor(item: InflationItem) {
+    return this.data.rcGroups?.find((group) => group.members.includes(item.priceCode));
+  }
+
+  private rcClassWeight(item: InflationItem, monthIndex: number) {
+    const group = this.rcGroupFor(item);
+    if (!group) return 0;
+    const members = group.members
+      .map((priceCode) => this.data.items.find((candidate) => candidate.level === 3 && candidate.priceCode === priceCode))
+      .filter((candidate): candidate is InflationItem => Boolean(candidate));
+    const total = members.reduce((sum, member) => sum + (finite(member.weights[monthIndex]) ? member.weights[monthIndex]! : 0), 0);
+    const itemWeight = item.weights[monthIndex];
+    return finite(itemWeight) && total > 0 ? group.weight * (itemWeight / total) : Number.NaN;
+  }
+
+  private rcWeightValue(item: InflationItem, monthIndex: number) {
+    const values = this.rcClassesFor(item).map((candidate) => this.rcClassWeight(candidate, monthIndex)).filter(finite);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) * 1000 : Number.NaN;
+  }
+
+  private rcContribution(item: InflationItem, monthIndex: number, horizon: Horizon) {
+    const values = this.rcClassesFor(item).map((candidate) => {
+      const weight = this.rcClassWeight(candidate, monthIndex);
+      const change = this.priceChange(candidate, monthIndex, horizon);
+      return finite(weight) && finite(change) ? weight * change : Number.NaN;
+    }).filter(finite);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) : Number.NaN;
+  }
+
+  private rcPriceValue(item: InflationItem, monthIndex: number, horizon: Horizon) {
+    if (item.level === 3) return this.priceChange(item, monthIndex, horizon);
+    const contribution = this.rcContribution(item, monthIndex, horizon);
+    const weight = this.rcWeightValue(item, monthIndex) / 1000;
+    return finite(contribution) && weight > 0 ? contribution / weight : Number.NaN;
   }
 
   private actualHeadlineChange(monthIndex: number, horizon: Horizon) {
@@ -403,6 +458,7 @@ export class InflationEngine {
   }
 
   contribution(item: InflationItem, monthIndex: number, horizon: Horizon) {
+    if (this.weighting === "rc") return this.rcContribution(item, monthIndex, horizon);
     const key = `${item.id}|${monthIndex}|${horizon}`;
     const cached = this.contributionCache.get(key);
     if (cached !== undefined) return cached;

@@ -13,9 +13,11 @@ interface Props<T extends string> {
   value: T;
   onChange: (value: T) => void;
   compact?: boolean;
+  selectedColor?: string;
+  selectedTextColor?: string;
 }
 
-export function SegmentedControl<T extends string>({ colors, options, value, onChange, compact }: Props<T>) {
+export function SegmentedControl<T extends string>({ colors, options, value, onChange, compact, selectedColor, selectedTextColor }: Props<T>) {
   return (
     <View style={[styles.track, { backgroundColor: colors.panelMuted, borderColor: colors.line }]}>
       {options.map((option) => {
@@ -29,11 +31,11 @@ export function SegmentedControl<T extends string>({ colors, options, value, onC
             style={({ pressed }) => [
               styles.option,
               compact && styles.compact,
-              selected && { backgroundColor: colors.blue },
+              selected && { backgroundColor: selectedColor ?? colors.blue },
               pressed && { opacity: 0.72 },
             ]}
           >
-            <Text style={[styles.label, { color: selected ? "#FFFFFF" : colors.ink }]}>{option.label}</Text>
+            <Text style={[styles.label, { color: selected ? selectedTextColor ?? "#FFFFFF" : colors.ink }]}>{option.label}</Text>
           </Pressable>
         );
       })}

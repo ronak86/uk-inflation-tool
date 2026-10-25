@@ -7,6 +7,7 @@ import { colorsFor } from "@/src/theme";
 const features = [
   "CPI, CPIH and RPI",
   "Month-on-month and year-on-year views",
+  "Bank of England rigid-central weighting for CPI",
   "Weights, price changes and contribution estimates",
   "Full basket drill-down and search",
   "Services, goods, core and non-core filters",
@@ -31,6 +32,13 @@ export default function AboutScreen() {
               <Text selectable style={[styles.featureText, { color: colors.ink }]}>{feature}</Text>
             </View>
           ))}
+        </View>
+        <View style={[styles.card, { backgroundColor: colors.panel, borderColor: colors.line }]}>
+          <Text selectable style={[styles.heading, { color: colors.ink }]}>Rigid-central CPI</Text>
+          <Text selectable style={[styles.body, { color: colors.muted }]}>Rigid-central (RC) CPI applies the Bank of England's 84 published class-group weights, which combine price rigidity with production-network centrality. The fixed weights sum to 100%.</Text>
+          <Text selectable style={[styles.body, { color: colors.muted }]}>RC is available for CPI only and stops at Level 3 because that is the class level at which the Bank publishes the weighting scheme. Package holidays has zero RC weight because it is absent from the published workbook. Sector and intensity filters are unavailable in RC view so the result remains the full Bank basket.</Text>
+          <Text onPress={() => Linking.openURL("https://www.bankofengland.co.uk/bank-insights/2026/inflation-in-central-sectors-with-rigid-prices")} style={[styles.link, { color: colors.blue }]}>Read the Bank of England explanation</Text>
+          <Text onPress={() => Linking.openURL("https://www.bankofengland.co.uk/-/media/boe/files/insights/2026/rc-inflation-weights.xlsx")} style={[styles.link, { color: colors.blue }]}>Download the published RC weights</Text>
         </View>
         <View style={[styles.card, { backgroundColor: colors.panel, borderColor: colors.line }]}>
           <Text selectable style={[styles.heading, { color: colors.ink }]}>Sources and method</Text>

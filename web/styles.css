@@ -758,6 +758,13 @@ body.resizing-controls {
   gap: 8px;
   min-height: 35px;
   padding: 4px 7px;
+  flex-wrap: wrap;
+}
+
+.view-control-group {
+  align-items: center;
+  display: flex;
+  gap: 7px;
 }
 
 .explorer-view-label {
@@ -813,6 +820,19 @@ body.resizing-controls {
 .measure-segments input:focus-visible + span {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+.weighting-segments {
+  grid-template-columns: repeat(2, max-content);
+}
+
+.weighting-segments input:checked + span {
+  background: #f4b942;
+  color: #17202a;
+}
+
+body.rc-weighting .level-row.level-0 td {
+  background: #8a4f08;
 }
 
 .context-menu {
@@ -1937,6 +1957,15 @@ tbody tr.selected-row .level-pill {
   body.mobile-explorer .explorer-view-toolbar {
     gap: 5px;
     padding: 5px 8px;
+  }
+
+  body.mobile-explorer .view-control-group {
+    flex: 1 1 100%;
+  }
+
+  body.mobile-explorer .weighting-segments {
+    flex: 1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   body.mobile-explorer .measure-segments {

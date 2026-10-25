@@ -5,6 +5,7 @@ const state = {
   monthIndex: 0,
   horizon: "mom",
   measure: "contribution",
+  weighting: "official",
   sectorView: "all",
   coreView: "all",
   boeView: "all",
@@ -225,6 +226,7 @@ function actualHeadlineChange(monthIndex, horizon) {
 }
 
 function priceMeasureValue(item, monthIndex) {
+  if (isRcWeighting()) return rcPriceValue(item, monthIndex, state.horizon);
   if (isSectorFiltered()) {
     if (item.level === leafLevel()) return priceChange(item, monthIndex, state.horizon);
     return aggregatePriceChange(activeLeafItemsFor(item), monthIndex, state.horizon);
@@ -235,6 +237,7 @@ function priceMeasureValue(item, monthIndex) {
 }
 
 function weightMeasureValue(item, monthIndex) {
+  if (isRcWeighting()) return rcWeightValue(item, monthIndex);
   if (!isSectorFiltered()) return item.weights[monthIndex];
   const leaves = activeLeafItemsFor(item);
   const itemWeight = activeWeightTotal(monthIndex, leaves);
@@ -259,12 +262,16 @@ function isRpi() {
   return state.indexFamily === "RPI";
 }
 
+function isRcWeighting() {
+  return state.indexFamily === "CPI" && state.weighting === "rc";
+}
+
 function leafLevel() {
   return Math.max(...state.data.items.map((item) => item.level));
 }
 
 function maxSelectableLevel() {
-  return leafLevel();
+  return isRcWeighting() ? 3 : leafLevel();
 }
 
 function previousJanuaryIndex(year) {
@@ -285,6 +292,7 @@ function calcCacheKey() {
     state.boeView,
     state.importIntensityView,
     state.energyIntensityView,
+    state.weighting,
   ].join("|");
 }
 
@@ -338,6 +346,10 @@ function setIndexFamily(indexFamily) {
   state.monthIndex = state.data.months.length - 1;
   state.sort = { type: "name", monthIndex: null };
   state.selectedRowId = null;
+  if (indexFamily !== "CPI" && state.weighting !== "official") {
+    state.weighting = "official";
+    checkRadio('[data-weighting="official"]');
+  }
   if (isRpi() && state.boeView !== "all") {
     state.boeView = "all";
     checkRadio('[data-boe-view="all"]');
@@ -375,6 +387,51 @@ function descendantsAtLevel(item, level) {
   return out;
 }
 
+function rcClassItemsFor(item) {
+  if (item.level === 3) return [item];
+  if (item.level > 3) return [];
+  return item.level === 0
+    ? state.data.items.filter((candidate) => candidate.level === 3)
+    : descendantsAtLevel(item, 3);
+}
+
+function rcGroupForClass(item) {
+  return state.data.rcGroups?.find((group) => group.members.includes(item.priceCode));
+}
+
+function rcClassWeight(item, monthIndex) {
+  const group = rcGroupForClass(item);
+  if (!group) return 0;
+  const members = group.members
+    .map((priceCode) => state.data.items.find((candidate) => candidate.level === 3 && candidate.priceCode === priceCode))
+    .filter(Boolean);
+  const total = members.reduce((sum, member) => sum + (Number.isFinite(member.weights[monthIndex]) ? member.weights[monthIndex] : 0), 0);
+  const itemWeight = item.weights[monthIndex];
+  if (!Number.isFinite(itemWeight) || total === 0) return NaN;
+  return group.weight * (itemWeight / total);
+}
+
+function rcWeightValue(item, monthIndex) {
+  const values = rcClassItemsFor(item).map((classItem) => rcClassWeight(classItem, monthIndex)).filter(Number.isFinite);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) * 1000 : NaN;
+}
+
+function rcContribution(item, monthIndex, horizon) {
+  const values = rcClassItemsFor(item).map((classItem) => {
+    const weight = rcClassWeight(classItem, monthIndex);
+    const change = priceChange(classItem, monthIndex, horizon);
+    return Number.isFinite(weight) && Number.isFinite(change) ? weight * change : NaN;
+  }).filter(Number.isFinite);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : NaN;
+}
+
+function rcPriceValue(item, monthIndex, horizon) {
+  if (item.level === 3) return priceChange(item, monthIndex, horizon);
+  const contributionValue = rcContribution(item, monthIndex, horizon);
+  const weight = rcWeightValue(item, monthIndex) / 1000;
+  return Number.isFinite(contributionValue) && weight > 0 ? contributionValue / weight : NaN;
+}
+
 function leafItemsFor(item) {
   const level = leafLevel();
   if (item.level === level) return [item];
@@ -383,6 +440,7 @@ function leafItemsFor(item) {
 }
 
 function isSectorFiltered() {
+  if (isRcWeighting()) return false;
   return state.sectorView !== "all"
     || state.coreView !== "all"
     || (!isRpi() && state.boeView !== "all")
@@ -451,6 +509,7 @@ function activeWeightTotal(monthIndex, leaves = null) {
 }
 
 function activeBasketName() {
+  if (isRcWeighting()) return "CPI Rigid-central index";
   const parts = [state.indexFamily];
   if (state.coreView === "core") parts.push("Core");
   if (state.coreView === "noncore") parts.push("Non Core");
@@ -470,10 +529,12 @@ function displayName(item) {
 }
 
 function displayWeightCode(item) {
+  if (isRcWeighting()) return "";
   return item.level === 0 && isSectorFiltered() ? "" : item.weightCode;
 }
 
 function displayPriceCode(item) {
+  if (isRcWeighting() && item.level === 0) return "";
   return item.level === 0 && isSectorFiltered() ? "" : item.priceCode;
 }
 
@@ -912,6 +973,7 @@ function leafContribution(item, monthIndex, horizon) {
 }
 
 function contribution(item, monthIndex, horizon) {
+  if (isRcWeighting()) return rcContribution(item, monthIndex, horizon);
   const cache = ensureCalcCache();
   const cacheKey = `${item.id}|${monthIndex}|${horizon}`;
   if (cache.contributions.has(cacheKey)) return cache.contributions.get(cacheKey);
@@ -1012,7 +1074,7 @@ function renderMobileChrome() {
     weight: "Weight",
   }[state.measure];
   if (els.mobileSelectionSummary) {
-    els.mobileSelectionSummary.textContent = `${state.indexFamily} · ${state.horizon === "mom" ? "MoM" : "YoY"} · ${measure}`;
+    els.mobileSelectionSummary.textContent = `${isRcWeighting() ? "RC CPI" : state.indexFamily} · ${state.horizon === "mom" ? "MoM" : "YoY"} · ${measure}`;
   }
   if (els.mobileMonthSelect) {
     els.mobileMonthSelect.innerHTML = state.data.months
@@ -1062,6 +1124,7 @@ function visibleAllItemsSorted() {
   const out = [];
 
   function appendBranch(item) {
+    if (isRcWeighting() && item.level > 3) return;
     if (item.level !== 0 && isSectorFiltered() && !activeLeafItemsFor(item).length) return;
     out.push(item);
     if (!state.expanded.has(item.id)) return;
@@ -1090,7 +1153,7 @@ function visibleItems() {
 
 function expandableItemIds() {
   return state.data.items
-    .filter((item) => item.children.length && (item.level === 0 || !isSectorFiltered() || activeLeafItemsFor(item).length))
+    .filter((item) => item.children.length && (!isRcWeighting() || item.level < 3) && (item.level === 0 || !isSectorFiltered() || activeLeafItemsFor(item).length))
     .map((item) => item.id);
 }
 
@@ -1167,7 +1230,7 @@ function renderExplorer() {
           `;
         })
         .join("");
-      const hasChildren = item.children.length > 0;
+      const hasChildren = item.children.length > 0 && (!isRcWeighting() || item.level < 3);
       const expanded = state.expanded.has(item.id);
       const toggle = hasChildren
         ? `<button class="tree-toggle" data-toggle="${item.id}" aria-label="${expanded ? "Collapse" : "Expand"} ${item.name}">${expanded ? "-" : "+"}</button>`
@@ -1559,6 +1622,9 @@ function renderErrors() {
       sectorView: state.sectorView,
       coreView: state.coreView,
       boeView: state.boeView,
+      importIntensityView: state.importIntensityView,
+      energyIntensityView: state.energyIntensityView,
+      weighting: state.weighting,
       expanded: new Set(state.expanded),
     };
     state.indexFamily = indexFamily;
@@ -1566,6 +1632,9 @@ function renderErrors() {
     state.sectorView = "all";
     state.coreView = "all";
     state.boeView = "none";
+    state.importIntensityView = "all";
+    state.energyIntensityView = "all";
+    state.weighting = "official";
     invalidateCalcCache();
     buildHierarchy();
     const result = callback();
@@ -1574,6 +1643,9 @@ function renderErrors() {
     state.sectorView = previous.sectorView;
     state.coreView = previous.coreView;
     state.boeView = previous.boeView;
+    state.importIntensityView = previous.importIntensityView;
+    state.energyIntensityView = previous.energyIntensityView;
+    state.weighting = previous.weighting;
     invalidateCalcCache();
     buildHierarchy();
     state.expanded = previous.expanded;
@@ -1695,6 +1767,14 @@ function applyTheme() {
 
 function updateIndexSpecificControls() {
   const isRpiSeries = isRpi();
+  const rcActive = isRcWeighting();
+  document.body.classList.toggle("rc-weighting", rcActive);
+  document.querySelectorAll("[data-rc-weighting-control]").forEach((node) => {
+    node.hidden = state.indexFamily !== "CPI";
+  });
+  document.querySelectorAll("[data-basket-filter]").forEach((node) => {
+    node.hidden = rcActive;
+  });
   const labels = isRpiSeries
     ? {
         1: "Level 1 (Broad Groups)",
@@ -1716,10 +1796,10 @@ function updateIndexSpecificControls() {
   });
 
   document.querySelectorAll("[data-level-option='4']").forEach((node) => {
-    node.hidden = isRpiSeries;
+    node.hidden = isRpiSeries || rcActive;
   });
   document.querySelectorAll("[data-boe-control]").forEach((node) => {
-    node.hidden = isRpiSeries;
+    node.hidden = isRpiSeries || rcActive;
   });
   document.querySelectorAll("[data-sector-option='housing']").forEach((node) => {
     node.hidden = !isRpiSeries;
@@ -1727,10 +1807,10 @@ function updateIndexSpecificControls() {
   const importAvailable = Boolean(state.data.classifications?.importIntensity);
   const energyAvailable = Boolean(state.data.classifications?.energyIntensity);
   document.querySelectorAll("[data-import-intensity-control]").forEach((node) => {
-    node.hidden = !importAvailable;
+    node.hidden = !importAvailable || rcActive;
   });
   document.querySelectorAll("[data-energy-intensity-control]").forEach((node) => {
-    node.hidden = !energyAvailable;
+    node.hidden = !energyAvailable || rcActive;
   });
   document.querySelectorAll("[data-energy-intensity-label]").forEach((node) => {
     node.textContent = state.data.classifications?.energyIntensity === "cpi-derived"
@@ -1884,6 +1964,32 @@ function bindEvents() {
   document.querySelectorAll("[data-measure]").forEach((button) => {
     button.addEventListener("change", () => {
       state.measure = button.dataset.measure;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-weighting]").forEach((button) => {
+    button.addEventListener("change", () => {
+      if (!button.checked || state.indexFamily !== "CPI") return;
+      state.weighting = button.dataset.weighting;
+      if (state.weighting === "rc") {
+        state.sectorView = "all";
+        state.coreView = "all";
+        state.boeView = "all";
+        state.importIntensityView = "all";
+        state.energyIntensityView = "all";
+        ["sector", "core", "boe", "import-intensity", "energy-intensity"].forEach((kind) => {
+          checkRadio(`[data-${kind}-view="all"]`);
+        });
+        if (Number(state.levelView) > 3) {
+          state.levelView = "all";
+          checkRadio('[data-level-view="all"]');
+        }
+      }
+      state.sort = { type: "name", monthIndex: null };
+      state.selectedRowId = null;
+      invalidateCalcCache();
+      updateIndexSpecificControls();
       render();
     });
   });

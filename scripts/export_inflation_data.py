@@ -15,6 +15,15 @@ MOBILE_OUTPUT = ROOT / "mobile" / "assets" / "data" / "inflation.json"
 INTENSITY_SOURCE = ROOT / "scripts" / "data" / "ons-intensity-source"
 IMPORT_INTENSITY_SOURCE = INTENSITY_SOURCE / "import-intensity-2026-08.xlsx"
 ENERGY_INTENSITY_SOURCE = INTENSITY_SOURCE / "energy-intensity-2023.xlsx"
+RC_SOURCE = ROOT / "scripts" / "data" / "boe-rc-source" / "rc-inflation-weights.xlsx"
+
+RC_CODE_ALIASES = {
+    "07.3.2": ("07.3.2/6",),
+    "09.2.1/2": ("09.2.1/2/3",),
+    "10.0": ("10.1/2/5", "10.4"),
+    "12.5.3": ("12.5.3/5",),
+    "12.6": ("12.6.2",),
+}
 
 
 def iso_month(value) -> str:
@@ -137,6 +146,55 @@ def annotate_intensities(payload: dict, intensity_defs: dict) -> None:
             "import": find_intensity_definition(series_defs.get("import", {}), item, class_item, "import"),
             "energy": find_intensity_definition(series_defs.get("energy", {}), item, class_item, "energy"),
         }
+
+
+def read_rc_groups() -> list[dict]:
+    workbook = load_workbook(RC_SOURCE, read_only=True, data_only=True)
+    sheet = workbook["Combined weights"]
+    groups = []
+    for code, description, weight in sheet.iter_rows(min_row=2, values_only=True):
+        if not code or weight is None:
+            continue
+        clean_group_code = str(code).strip()
+        groups.append({
+            "code": clean_group_code,
+            "name": str(description).strip(),
+            "weight": float(weight),
+            "memberCodes": list(RC_CODE_ALIASES.get(clean_group_code, (clean_group_code,))),
+        })
+    total = sum(group["weight"] for group in groups)
+    if len(groups) != 84 or abs(total - 1) > 1e-10:
+        raise ValueError(f"Unexpected Bank RC source: {len(groups)} groups sum to {total}")
+    return groups
+
+
+def annotate_rc_groups(payload: dict, rc_groups: list[dict]) -> None:
+    payload["classifications"]["rcWeighting"] = "official" if payload["series"] == "CPI" else None
+    if payload["series"] != "CPI":
+        payload["rcGroups"] = []
+        return
+
+    classes = {
+        class_key(item["name"]): item
+        for item in payload["items"]
+        if item["level"] == 3
+    }
+    matched_codes = set()
+    output = []
+    for group in rc_groups:
+        members = []
+        for code in group["memberCodes"]:
+            item = classes.get(code)
+            if item is None:
+                raise ValueError(f"Bank RC group {group['code']} could not map CPI class {code}")
+            members.append(item["priceCode"])
+            matched_codes.add(code)
+        output.append({**group, "members": members})
+
+    unmatched = set(classes) - matched_codes
+    if unmatched != {"09.6"}:
+        raise ValueError(f"Unexpected CPI classes outside Bank RC weighting: {sorted(unmatched)}")
+    payload["rcGroups"] = output
 
 
 def read_legacy_sector_defs(workbook) -> dict:
@@ -337,6 +395,7 @@ def main() -> None:
     overall_3dp = read_overall_3dp(workbook)
     sector_defs = read_sector_defs(workbook)
     intensity_defs = read_intensity_definitions()
+    rc_groups = read_rc_groups()
     series_payloads = {
         series: read_series(workbook, series)
         for series in ("CPIH", "CPI", "RPI")
@@ -347,6 +406,7 @@ def main() -> None:
     for payload in series_payloads.values():
         annotate_sectors(payload, sector_defs)
         annotate_intensities(payload, intensity_defs)
+        annotate_rc_groups(payload, rc_groups)
 
     payload = {
         "sourceWorkbook": SOURCE.name,
