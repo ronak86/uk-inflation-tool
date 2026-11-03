@@ -1,6 +1,6 @@
 # UK Inflation iPhone App
 
-This folder contains the native Expo/React Native version of the UK Inflation Tool. It is a separate client from the desktop website, but uses the same exported data and calculation methodology.
+This folder contains the native Expo/React Native UK Inflation Tool.
 
 ## Current first build
 
@@ -27,10 +27,10 @@ Install **Expo Go** on an iPhone and scan the QR code shown by Expo. The phone a
 
 Running `scripts/export_inflation_data.py` from the repository root now writes the same compact payload to:
 
-- `web/data/inflation.json` for the website and live mobile refresh.
+- `web/data/inflation.json` for live mobile refreshes.
 - `mobile/assets/data/inflation.json` as the app's offline fallback.
 
-The live app normally receives new data from the website without an App Store release. A new iPhone build is only needed when code, design or the bundled fallback should change.
+The live app normally receives new data from the published data endpoint without an App Store release. A new iPhone build is only needed when code, design or the bundled fallback should change.
 
 ## Validation
 

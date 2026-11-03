@@ -1,29 +1,13 @@
 # UK Inflation Tool Workflow
 
-This project powers the static UK inflation tool at:
-
-https://chitroda.com/inflation.html
-
-The live site is served from GitHub Pages via the `main` branch of:
+This project powers the UK Inflation iPhone app. GitHub Pages remains enabled only to serve the app's live JSON data from the `main` branch of:
 
 https://github.com/ronak86/uk-inflation-tool
 
 ## Important Files
 
-- `inflation.html`  
-  The public entry point for GitHub Pages.
-
-- `web/index.html`  
-  The local development entry point.
-
-- `web/app.js`  
-  Most of the app logic: table rendering, filters, sorting, chart context menu, contribution calculations, sector handling, tabs, and copy behaviour.
-
-- `web/styles.css`  
-  Visual styling for the app.
-
 - `web/data/inflation.json` and `web/data/inflation-data.js`  
-  Generated data used by the browser app.
+  Generated live data. The iPhone app refreshes from `web/data/inflation.json`.
 
 - `Weights And Prices.xlsx`  
   The source workbook now tracked in Git. It contains CPI, CPIH, RPI, headline overall series, and definitions used to build the generated data.
@@ -79,7 +63,7 @@ On each dispatched run GitHub will:
 8. Validate the mobile calculation engine.
 9. Commit the changed workbook and generated data files.
 10. Push the commit to `main`.
-11. GitHub Pages updates the live website automatically.
+11. GitHub Pages publishes the updated JSON endpoint used by the iPhone app.
 12. A notification email is sent when the update finishes successfully or fails.
 
 GitHub also checks every day at 08:30 UTC as a later backup. Non-release dates and already-completed releases are no-ops. The PC does not need to be switched on.
@@ -136,4 +120,4 @@ These are deliberately ignored locally:
 - downloaded PDFs or macro workbooks
 - local scratch workbook copies
 
-They are not needed for the live website.
+They are not needed for the live app data service.

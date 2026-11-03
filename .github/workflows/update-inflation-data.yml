@@ -120,7 +120,7 @@ jobs:
             sleep 120
           done
 
-      - name: Rebuild website data
+      - name: Rebuild app data
         if: steps.date-check.outputs.run_update == 'true'
         run: python scripts/export_inflation_data.py
 
@@ -159,8 +159,8 @@ jobs:
           NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}
         run: |
           python scripts/send_notification_email.py \
-            --subject "UK Inflation Tool website updated" \
-            --body "The UK Inflation Tool update triggered by ${{ steps.date-check.outputs.trigger_source }} has finished successfully for ${{ steps.date-check.outputs.expected_month }}. Data changes committed: ${{ steps.commit-push.outputs.changed }}. Live site: https://chitroda.com/inflation.html"
+            --subject "UK Inflation app data updated" \
+            --body "The UK Inflation app update triggered by ${{ steps.date-check.outputs.trigger_source }} has finished successfully for ${{ steps.date-check.outputs.expected_month }}. Data changes committed: ${{ steps.commit-push.outputs.changed }}."
 
       - name: Send failure email
         if: steps.date-check.outputs.run_update == 'true' && failure()
