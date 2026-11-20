@@ -71,8 +71,8 @@ export class InflationEngine {
     return this.filters.sector !== "all"
       || this.filters.core !== "all"
       || (!this.isRpi && this.filters.boe !== "all")
-      || this.filters.importIntensity !== "all"
-      || this.filters.energyIntensity !== "all";
+      || this.filters.importIntensity.length > 0
+      || this.filters.energyIntensity.length > 0;
   }
 
   allItems() {
@@ -98,8 +98,12 @@ export class InflationEngine {
     if (this.filters.sector === "housing") parts.push("Housing");
     if (!this.isRpi && this.filters.boe === "boe") parts.push("BoE Services");
     if (!this.isRpi && this.filters.boe === "exboe") parts.push("ex BoE Services");
-    if (this.filters.importIntensity !== "all") parts.push(`${intensityDisplayLabel(this.filters.importIntensity)} Import Intensity`);
-    if (this.filters.energyIntensity !== "all") parts.push(`${intensityDisplayLabel(this.filters.energyIntensity)} Energy Intensity`);
+    if (this.filters.importIntensity.length) {
+      parts.push(`${this.filters.importIntensity.map(intensityDisplayLabel).join(" + ")} Import Intensity`);
+    }
+    if (this.filters.energyIntensity.length) {
+      parts.push(`${this.filters.energyIntensity.map(intensityDisplayLabel).join(" + ")} Energy Intensity`);
+    }
     return parts.length === 1 ? this.allItems().name : `${parts.join(" ")} index`;
   }
 
@@ -134,10 +138,10 @@ export class InflationEngine {
     if (this.filters.core === "noncore" && !flags.nonCore) return false;
     if (!this.isRpi && this.filters.boe === "boe" && !flags.boe) return false;
     if (!this.isRpi && this.filters.boe === "exboe" && !flags.exBoe) return false;
-    if (this.filters.importIntensity !== "all"
-      && intensityFilterValue(item.intensity?.import?.group) !== this.filters.importIntensity) return false;
-    if (this.filters.energyIntensity !== "all"
-      && intensityFilterValue(item.intensity?.energy?.group) !== this.filters.energyIntensity) return false;
+    const importIntensity = intensityFilterValue(item.intensity?.import?.group) as FilterState["importIntensity"][number];
+    const energyIntensity = intensityFilterValue(item.intensity?.energy?.group) as FilterState["energyIntensity"][number];
+    if (this.filters.importIntensity.length && !this.filters.importIntensity.includes(importIntensity)) return false;
+    if (this.filters.energyIntensity.length && !this.filters.energyIntensity.includes(energyIntensity)) return false;
     return true;
   }
 

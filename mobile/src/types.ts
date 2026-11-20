@@ -5,8 +5,8 @@ export type Weighting = "official" | "rc";
 export type SectorView = "all" | "services" | "goods" | "housing";
 export type CoreView = "all" | "core" | "noncore";
 export type BoeView = "all" | "boe" | "exboe";
-export type ImportIntensityView = "all" | "0-10" | "10-25" | "25-40" | "40-plus" | "energy" | "ooh" | "unclassified";
-export type EnergyIntensityView = "all" | "very-low" | "low" | "high" | "very-high" | "energy" | "rents" | "unclassified";
+export type ImportIntensityView = "0-10" | "10-25" | "25-40" | "40-plus" | "energy" | "ooh" | "unclassified";
+export type EnergyIntensityView = "very-low" | "low" | "high" | "very-high" | "energy" | "rents" | "unclassified";
 
 export interface SectorFlags {
   boe: boolean;
@@ -68,8 +68,8 @@ export interface FilterState {
   sector: SectorView;
   core: CoreView;
   boe: BoeView;
-  importIntensity: ImportIntensityView;
-  energyIntensity: EnergyIntensityView;
+  importIntensity: ImportIntensityView[];
+  energyIntensity: EnergyIntensityView[];
 }
 
 export interface ExplorerRow {

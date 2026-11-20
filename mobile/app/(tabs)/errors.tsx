@@ -37,7 +37,7 @@ export default function ErrorsScreen() {
   const matrix = useMemo(() => {
     const series = prepareSeries(data.series[family]);
     const engine = new InflationEngine(series, {
-      sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all",
+      sector: "all", core: "all", boe: "all", importIntensity: [], energyIntensity: [],
     });
     const leafLevel = family === "RPI" ? 3 : 4;
     const leaves = series.items.filter((item) => item.level === leafLevel);

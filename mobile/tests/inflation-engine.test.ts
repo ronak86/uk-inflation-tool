@@ -14,7 +14,7 @@ const data = payload as InflationPayload;
 const families: IndexFamily[] = ["CPI", "CPIH", "RPI"];
 const horizons: Horizon[] = ["mom", "yoy"];
 const allFilters: FilterState = {
-  sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all",
+  sector: "all", core: "all", boe: "all", importIntensity: [], energyIntensity: [],
 };
 
 function engineFor(family: IndexFamily, filters = allFilters) {
@@ -129,7 +129,7 @@ describe("classification partitions", () => {
   });
 
   it("keeps CPIH energy-unclassified items as a calculable basket", () => {
-    const engine = engineFor("CPIH", { ...allFilters, energyIntensity: "unclassified" });
+    const engine = engineFor("CPIH", { ...allFilters, energyIntensity: ["unclassified"] });
     const leaves = engine.data.items.filter((item) => item.level === engine.leafLevel && !item.intensity?.energy);
     const monthIndex = engine.data.months.length - 1;
     expect(leaves.map((leaf) => leaf.name)).toEqual(expect.arrayContaining([
@@ -139,6 +139,40 @@ describe("classification partitions", () => {
     expect(engine.value(engine.allItems(), monthIndex, "mom", "weight")).toBeGreaterThan(0);
     expect(Number.isFinite(engine.value(engine.allItems(), monthIndex, "mom", "price"))).toBe(true);
     expect(Number.isFinite(engine.value(engine.allItems(), monthIndex, "mom", "contribution"))).toBe(true);
+  });
+
+  it("combines selected import-intensity groups into one sub-index", () => {
+    const first = engineFor("CPI", { ...allFilters, importIntensity: ["0-10"] });
+    const second = engineFor("CPI", { ...allFilters, importIntensity: ["10-25"] });
+    const combined = engineFor("CPI", { ...allFilters, importIntensity: ["0-10", "10-25"] });
+    const monthIndex = combined.data.months.length - 1;
+    const ids = (engine: InflationEngine) => engine.activeLeavesFor(engine.allItems()).map((item) => item.id).sort((a, b) => a! - b!);
+    const expectedIds = [...new Set([...ids(first), ...ids(second)])].sort((a, b) => a! - b!);
+
+    expect(ids(combined)).toEqual(expectedIds);
+    expect(combined.value(combined.allItems(), monthIndex, "mom", "weight")).toBeCloseTo(
+      first.value(first.allItems(), monthIndex, "mom", "weight")
+      + second.value(second.allItems(), monthIndex, "mom", "weight"),
+      8,
+    );
+    expect(Number.isFinite(combined.value(combined.allItems(), monthIndex, "mom", "price"))).toBe(true);
+    expect(Number.isFinite(combined.value(combined.allItems(), monthIndex, "mom", "contribution"))).toBe(true);
+  });
+
+  it("combines selected energy-intensity groups into one sub-index", () => {
+    const low = engineFor("CPI", { ...allFilters, energyIntensity: ["low"] });
+    const high = engineFor("CPI", { ...allFilters, energyIntensity: ["high"] });
+    const combined = engineFor("CPI", { ...allFilters, energyIntensity: ["low", "high"] });
+    const monthIndex = combined.data.months.length - 1;
+
+    expect(combined.activeLeavesFor(combined.allItems())).toHaveLength(
+      low.activeLeavesFor(low.allItems()).length + high.activeLeavesFor(high.allItems()).length,
+    );
+    expect(combined.value(combined.allItems(), monthIndex, "mom", "weight")).toBeCloseTo(
+      low.value(low.allItems(), monthIndex, "mom", "weight")
+      + high.value(high.allItems(), monthIndex, "mom", "weight"),
+      8,
+    );
   });
 
   it.each(families)("%s core and non-core leaf weights reconstruct the full basket", (family) => {

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { CheckboxGroup } from "@/src/components/CheckboxGroup";
 import { RadioGroup } from "@/src/components/RadioGroup";
 import { SegmentedControl } from "@/src/components/SegmentedControl";
 import { useAppData } from "@/src/context/AppDataContext";
@@ -33,13 +34,13 @@ import {
 } from "@/src/types";
 
 const importIntensityOptions: Array<{ label: string; value: ImportIntensityView }> = [
-  { label: "All", value: "all" }, { label: "0-10%", value: "0-10" }, { label: "10-25%", value: "10-25" },
+  { label: "0-10%", value: "0-10" }, { label: "10-25%", value: "10-25" },
   { label: "25-40%", value: "25-40" }, { label: "40% plus", value: "40-plus" }, { label: "Energy", value: "energy" },
   { label: "OOH", value: "ooh" }, { label: "Unclassified", value: "unclassified" },
 ];
 
 const energyIntensityOptions: Array<{ label: string; value: EnergyIntensityView }> = [
-  { label: "All", value: "all" }, { label: "Very Low", value: "very-low" }, { label: "Low", value: "low" },
+  { label: "Very Low", value: "very-low" }, { label: "Low", value: "low" },
   { label: "High", value: "high" }, { label: "Very High", value: "very-high" }, { label: "Energy", value: "energy" },
   { label: "Rents", value: "rents" }, { label: "Unclassified", value: "unclassified" },
 ];
@@ -93,7 +94,7 @@ export default function ExplorerScreen() {
   const [measure, setMeasure] = useState<Measure>("contribution");
   const [weighting, setWeighting] = useState<Weighting>("official");
   const [filters, setFilters] = useState<FilterState>({
-    sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all",
+    sector: "all", core: "all", boe: "all", importIntensity: [], energyIntensity: [],
   });
   const [monthOffsets, setMonthOffsets] = useState<Record<IndexFamily, number>>({ CPI: 0, CPIH: 0, RPI: 0 });
   const [expanded, setExpanded] = useState<Set<number>>(new Set([0]));
@@ -106,11 +107,11 @@ export default function ExplorerScreen() {
   const engine = useMemo(() => new InflationEngine(series, filters, weighting), [series, filters, weighting]);
   const availableImportOptions = useMemo(() => {
     const values = new Set(series.items.filter((item) => item.level === 4).map((item) => intensityFilterValue(item.intensity?.import?.group)));
-    return importIntensityOptions.filter((option) => option.value === "all" || values.has(option.value));
+    return importIntensityOptions.filter((option) => values.has(option.value));
   }, [series]);
   const availableEnergyOptions = useMemo(() => {
     const values = new Set(series.items.filter((item) => item.level === 4).map((item) => intensityFilterValue(item.intensity?.energy?.group)));
-    return energyIntensityOptions.filter((option) => option.value === "all" || values.has(option.value));
+    return energyIntensityOptions.filter((option) => values.has(option.value));
   }, [series]);
   const monthIndex = Math.max(0, series.months.length - 1 - monthOffsets[family]);
 
@@ -168,8 +169,8 @@ export default function ExplorerScreen() {
       ...current,
       boe: next === "RPI" ? "all" : current.boe,
       sector: next !== "RPI" && current.sector === "housing" ? "all" : current.sector,
-      importIntensity: "all",
-      energyIntensity: "all",
+      importIntensity: [],
+      energyIntensity: [],
     }));
   };
 
@@ -179,7 +180,7 @@ export default function ExplorerScreen() {
     setLevel("all");
     setSortDirection("none");
     if (next === "rc") {
-      setFilters({ sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all" });
+      setFilters({ sector: "all", core: "all", boe: "all", importIntensity: [], energyIntensity: [] });
     }
   };
 
@@ -203,8 +204,8 @@ export default function ExplorerScreen() {
   const setSector = (sector: SectorView) => setFilters((current) => ({ ...current, sector }));
   const setCore = (core: CoreView) => setFilters((current) => ({ ...current, core }));
   const setBoe = (boe: BoeView) => setFilters((current) => ({ ...current, boe }));
-  const setImportIntensity = (importIntensity: ImportIntensityView) => setFilters((current) => ({ ...current, importIntensity }));
-  const setEnergyIntensity = (energyIntensity: EnergyIntensityView) => setFilters((current) => ({ ...current, energyIntensity }));
+  const setImportIntensity = (importIntensity: ImportIntensityView[]) => setFilters((current) => ({ ...current, importIntensity }));
+  const setEnergyIntensity = (energyIntensity: EnergyIntensityView[]) => setFilters((current) => ({ ...current, energyIntensity }));
 
   return (
     <SafeAreaView edges={["top"]} style={[styles.safe, { backgroundColor: colors.canvas }]}>
@@ -388,12 +389,12 @@ export default function ExplorerScreen() {
                 ) : null}
                 {series.classifications?.importIntensity ? (
                   <FilterSection title="Import intensity" colors={colors}>
-                    <RadioGroup colors={colors} value={filters.importIntensity} onChange={setImportIntensity} options={availableImportOptions} />
+                    <CheckboxGroup colors={colors} selected={filters.importIntensity} onChange={setImportIntensity} options={availableImportOptions} />
                   </FilterSection>
                 ) : null}
                 {series.classifications?.energyIntensity ? (
                   <FilterSection title={series.classifications.energyIntensity === "cpi-derived" ? "Energy intensity (CPI-derived)" : "Energy intensity"} colors={colors}>
-                    <RadioGroup colors={colors} value={filters.energyIntensity} onChange={setEnergyIntensity} options={availableEnergyOptions} />
+                    <CheckboxGroup colors={colors} selected={filters.energyIntensity} onChange={setEnergyIntensity} options={availableEnergyOptions} />
                   </FilterSection>
                 ) : null}
                 </>}
@@ -401,7 +402,7 @@ export default function ExplorerScreen() {
                   <RadioGroup colors={colors} value={level} onChange={setLevel} options={levelOptions(family, weighting)} />
                 </FilterSection>
                 <Pressable
-                  onPress={() => { setFilters({ sector: "all", core: "all", boe: "all", importIntensity: "all", energyIntensity: "all" }); setLevel("all"); }}
+                  onPress={() => { setFilters({ sector: "all", core: "all", boe: "all", importIntensity: [], energyIntensity: [] }); setLevel("all"); }}
                   style={[styles.resetButton, { borderColor: colors.line }]}
                 >
                   <Text style={[styles.resetText, { color: colors.blue }]}>Reset all filters</Text>
