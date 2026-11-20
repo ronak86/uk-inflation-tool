@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CheckboxGroup } from "@/src/components/CheckboxGroup";
+import { HistoryChartSheet } from "@/src/components/HistoryChartSheet";
 import { RadioGroup } from "@/src/components/RadioGroup";
 import { SegmentedControl } from "@/src/components/SegmentedControl";
 import { useAppData } from "@/src/context/AppDataContext";
@@ -102,6 +103,7 @@ export default function ExplorerScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sortDirection, setSortDirection] = useState<"none" | "asc" | "desc">("none");
+  const [chartItem, setChartItem] = useState<InflationItem | null>(null);
 
   const series = useMemo(() => prepareSeries(data.series[family]), [data, family]);
   const engine = useMemo(() => new InflationEngine(series, filters, weighting), [series, filters, weighting]);
@@ -346,6 +348,14 @@ export default function ExplorerScreen() {
               ]}>
                 {engine.format(row.value, measure)}
               </Text>
+              <Pressable
+                accessibilityLabel={`Chart ${engine.displayName(row.item)}`}
+                hitSlop={5}
+                onPress={(event) => { event.stopPropagation(); setChartItem(row.item); }}
+                style={styles.chartButton}
+              >
+                <SymbolView name="chart.xyaxis.line" tintColor={headline ? "#FFFFFF" : colors.blue} size={17} />
+              </Pressable>
             </Pressable>
           );
         }}
@@ -412,6 +422,14 @@ export default function ExplorerScreen() {
           />
         </SafeAreaView>
       </Modal>
+      <HistoryChartSheet
+        colors={colors}
+        engine={engine}
+        initialHorizon={horizon}
+        initialMeasure={measure}
+        item={chartItem}
+        onClose={() => setChartItem(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -455,7 +473,8 @@ const styles = StyleSheet.create({
   disclosureSlot: { alignItems: "center", justifyContent: "center", width: 23 },
   rowName: { flex: 1, fontSize: 13, lineHeight: 16 },
   level: { fontSize: 10, fontWeight: "700", marginLeft: 5 },
-  rowValue: { fontSize: 13, fontVariant: ["tabular-nums"], fontWeight: "700", textAlign: "right", width: 72 },
+  rowValue: { fontSize: 13, fontVariant: ["tabular-nums"], fontWeight: "700", textAlign: "right", width: 60 },
+  chartButton: { alignItems: "center", height: 32, justifyContent: "center", marginLeft: 2, width: 30 },
   headlineText: { fontWeight: "800" },
   empty: { padding: 24, textAlign: "center" },
   modal: { flex: 1 },
