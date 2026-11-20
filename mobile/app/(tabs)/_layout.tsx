@@ -27,7 +27,7 @@ export default function TabLayout() {
         name="charts"
         options={{
           title: "Charts",
-          tabBarIcon: ({ color }) => <SymbolView name="chart.bar" tintColor={color} size={22} />,
+          tabBarIcon: ({ color }) => <SymbolView name="chart.xyaxis.line" tintColor={color} size={22} />,
         }}
       />
       <Tabs.Screen
