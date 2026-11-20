@@ -1,82 +1,59 @@
 import { useMemo, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
-import { LineChart } from "react-native-gifted-charts";
+import { GestureResponderEvent, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { chartScale } from "@/src/charting";
 import { AppColors } from "@/src/theme";
 
-export interface TimeSeriesPoint {
-  month: string;
-  value: number;
-}
+export interface TimeSeriesPoint { month: string; value: number; }
+export interface TimeSeriesLine { name: string; color: string; points: TimeSeriesPoint[]; }
+interface Props { colors: AppColors; decimals: number; lines: TimeSeriesLine[]; unit: string; }
 
-export interface TimeSeriesLine {
-  name: string;
-  color: string;
-  points: TimeSeriesPoint[];
-}
-
-interface Props {
-  colors: AppColors;
-  decimals: number;
-  lines: TimeSeriesLine[];
-  unit: string;
-}
-
-interface GiftedPoint {
-  value: number;
-  month: string;
-  label: string;
-  labelTextStyle: { color: string; fontSize: number };
-}
+const chartHeight = 270;
+const margin = { top: 18, right: 10, bottom: 36, left: 47 };
 
 function shortMonth(month: string) {
   const [year, monthNumber] = month.split("-");
   const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${names[Number(monthNumber) - 1]}\n${year.slice(2)}`;
+  return `${names[Number(monthNumber) - 1]} ${year.slice(2)}`;
+}
+
+function linePath(points: TimeSeriesPoint[], x: (index: number) => number, y: (value: number) => number) {
+  return points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(2)},${y(point.value).toFixed(2)}`).join(" ");
 }
 
 export function TimeSeriesChart({ colors, decimals, lines, unit }: Props) {
   const [width, setWidth] = useState(0);
-  const visibleLines = lines.slice(0, 3);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const visibleLines = lines.filter((line) => line.points.length > 1).slice(0, 3);
+  const longest = Math.max(0, ...visibleLines.map((line) => line.points.length));
   const scale = useMemo(
     () => chartScale(visibleLines.flatMap((line) => line.points.map((point) => point.value))),
     [visibleLines],
   );
-  const longest = Math.max(0, ...visibleLines.map((line) => line.points.length));
-  const labelEvery = Math.max(1, Math.ceil(longest / 5));
-  const chartData = visibleLines.map((line) => line.points.map((point, index): GiftedPoint => ({
-    value: point.value,
-    month: point.month,
-    label: index % labelEvery === 0 || index === line.points.length - 1 ? shortMonth(point.month) : "",
-    labelTextStyle: { color: colors.muted, fontSize: 9 },
-  })));
+  const plotWidth = Math.max(1, width - margin.left - margin.right);
+  const plotHeight = chartHeight - margin.top - margin.bottom;
+  const totalRange = scale.maxValue + scale.mostNegativeValue;
+  const x = (index: number) => margin.left + (longest <= 1 ? 0 : index / (longest - 1) * plotWidth);
+  const y = (value: number) => margin.top + (scale.maxValue - value) / totalRange * plotHeight;
+  const ticks = Array.from({ length: scale.sections + scale.sectionsBelow + 1 }, (_, index) => -scale.mostNegativeValue + index * scale.step);
+  const xTickIndices = Array.from(new Set([0, Math.round((longest - 1) / 4), Math.round((longest - 1) / 2), Math.round((longest - 1) * 3 / 4), longest - 1]));
 
-  const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
-  if (!visibleLines.length || longest < 2) {
+  const inspect = (event: GestureResponderEvent) => {
+    if (longest < 2) return;
+    const location = Math.max(margin.left, Math.min(margin.left + plotWidth, event.nativeEvent.locationX));
+    setSelectedIndex(Math.round((location - margin.left) / plotWidth * (longest - 1)));
+  };
+
+  if (!visibleLines.length) {
     return <View style={styles.empty}><Text style={{ color: colors.muted }}>Not enough history to chart.</Text></View>;
   }
 
-  const formatValue = (value: number) => `${value.toFixed(decimals)} ${unit}`;
-  const pointerLabel = (items: GiftedPoint[]) => {
-    if (!items?.length) return null;
-    return (
-      <View style={[styles.tooltip, { backgroundColor: colors.ink }]}>
-        <Text style={[styles.tooltipMonth, { color: colors.panel }]}>{shortMonth(items[0].month).replace("\n", " ")}</Text>
-        {items.map((item, index) => (
-          <View key={`${visibleLines[index]?.name}-${index}`} style={styles.tooltipRow}>
-            <View style={[styles.tooltipDot, { backgroundColor: visibleLines[index]?.color ?? colors.blue }]} />
-            <Text numberOfLines={1} style={[styles.tooltipText, { color: colors.panel }]}>
-              {visibleLines.length > 1 ? `${visibleLines[index]?.name}: ` : ""}{formatValue(item.value)}
-            </Text>
-          </View>
-        ))}
-      </View>
-    );
-  };
+  const selected = selectedIndex === null ? [] : visibleLines.map((line) => line.points[Math.min(selectedIndex, line.points.length - 1)]);
+  const selectedMonth = selected.find(Boolean)?.month;
 
   return (
-    <View onLayout={onLayout} style={styles.wrap}>
+    <View onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)} style={styles.wrap}>
       {visibleLines.length > 1 ? (
         <View style={styles.legend}>
           {visibleLines.map((line) => (
@@ -88,56 +65,50 @@ export function TimeSeriesChart({ colors, decimals, lines, unit }: Props) {
         </View>
       ) : null}
       {width > 0 ? (
-        <LineChart
-          adjustToWidth
-          areaChart={visibleLines.length === 1}
-          color1={visibleLines[0]?.color}
-          color2={visibleLines[1]?.color}
-          color3={visibleLines[2]?.color}
-          data={chartData[0]}
-          data2={chartData[1]}
-          data3={chartData[2]}
-          dataPointsRadius1={0}
-          dataPointsRadius2={0}
-          dataPointsRadius3={0}
-          disableScroll
-          endFillColor1={visibleLines[0]?.color}
-          endOpacity={0.03}
-          endSpacing={8}
-          formatYLabel={(label) => Number(label).toFixed(Math.abs(scale.step) < 1 ? 1 : 0)}
-          height={245}
-          initialSpacing={8}
-          maxValue={scale.maxValue}
-          mostNegativeValue={scale.mostNegativeValue}
-          noOfSections={scale.sections}
-          noOfSectionsBelowXAxis={scale.sectionsBelow}
-          pointerConfig={{
-            activatePointersInstantlyOnTouch: true,
-            autoAdjustPointerLabelPosition: true,
-            pointerColor: visibleLines[0]?.color,
-            pointerLabelComponent: pointerLabel,
-            pointerLabelHeight: 76,
-            pointerLabelWidth: 156,
-            pointerStripColor: colors.muted,
-            pointerStripWidth: 1,
-            radius: 4,
-          }}
-          rulesColor={colors.line}
-          rulesType="solid"
-          startFillColor1={visibleLines[0]?.color}
-          startOpacity={0.14}
-          thickness1={2.5}
-          thickness2={2.5}
-          thickness3={2.5}
-          width={Math.max(220, width - 54)}
-          xAxisColor={colors.ink}
-          xAxisLabelTextStyle={{ color: colors.muted, fontSize: 9 }}
-          xAxisThickness={1}
-          yAxisColor={colors.ink}
-          yAxisLabelSuffix={unit ? ` ${unit}` : ""}
-          yAxisTextStyle={{ color: colors.muted, fontSize: 9 }}
-          yAxisThickness={1}
-        />
+        <View style={styles.chartWrap}>
+          <Svg height={chartHeight} width={width}>
+            {ticks.map((tick) => (
+              <Line key={tick} stroke={Math.abs(tick) < 0.0000001 ? colors.ink : colors.line} strokeWidth={Math.abs(tick) < 0.0000001 ? 1.2 : 1} x1={margin.left} x2={margin.left + plotWidth} y1={y(tick)} y2={y(tick)} />
+            ))}
+            <Line stroke={colors.ink} strokeWidth={1} x1={margin.left} x2={margin.left} y1={margin.top} y2={margin.top + plotHeight} />
+            {ticks.map((tick) => (
+              <SvgText fill={colors.muted} fontSize={9} key={`label-${tick}`} textAnchor="end" x={margin.left - 6} y={y(tick) + 3}>
+                {`${tick.toFixed(Math.abs(scale.step) < 1 ? 1 : 0)}${unit ? ` ${unit}` : ""}`}
+              </SvgText>
+            ))}
+            {xTickIndices.map((index) => (
+              <SvgText fill={colors.muted} fontSize={9} key={`month-${index}`} textAnchor={index === 0 ? "start" : index === longest - 1 ? "end" : "middle"} x={x(index)} y={chartHeight - 12}>
+                {shortMonth(visibleLines[0].points[index]?.month ?? "")}
+              </SvgText>
+            ))}
+            {visibleLines.map((line) => (
+              <Path d={linePath(line.points, x, y)} fill="none" key={line.name} stroke={line.color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
+            ))}
+            {selectedIndex !== null ? (
+              <>
+                <Line stroke={colors.muted} strokeWidth={1} x1={x(selectedIndex)} x2={x(selectedIndex)} y1={margin.top} y2={margin.top + plotHeight} />
+                {visibleLines.map((line) => {
+                  const point = line.points[Math.min(selectedIndex, line.points.length - 1)];
+                  return point ? <Circle cx={x(selectedIndex)} cy={y(point.value)} fill={line.color} key={`point-${line.name}`} r={4} stroke={colors.panel} strokeWidth={2} /> : null;
+                })}
+              </>
+            ) : null}
+          </Svg>
+          <View onMoveShouldSetResponder={() => true} onResponderGrant={inspect} onResponderMove={inspect} onStartShouldSetResponder={() => true} style={StyleSheet.absoluteFill} />
+          {selectedMonth ? (
+            <View pointerEvents="none" style={[styles.tooltip, { backgroundColor: colors.ink }]}>
+              <Text style={[styles.tooltipMonth, { color: colors.panel }]}>{shortMonth(selectedMonth)}</Text>
+              {selected.map((point, index) => point ? (
+                <View key={visibleLines[index].name} style={styles.tooltipRow}>
+                  <View style={[styles.tooltipDot, { backgroundColor: visibleLines[index].color }]} />
+                  <Text numberOfLines={1} style={[styles.tooltipText, { color: colors.panel }]}>
+                    {visibleLines.length > 1 ? `${visibleLines[index].name}: ` : ""}{point.value.toFixed(decimals)} {unit}
+                  </Text>
+                </View>
+              ) : null)}
+            </View>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -145,14 +116,15 @@ export function TimeSeriesChart({ colors, decimals, lines, unit }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { minHeight: 292, width: "100%" },
+  chartWrap: { height: chartHeight, position: "relative", width: "100%" },
   empty: { alignItems: "center", height: 280, justifyContent: "center" },
   legend: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 8 },
   legendItem: { alignItems: "center", flexDirection: "row", gap: 5 },
   legendDot: { borderRadius: 4, height: 8, width: 8 },
   legendText: { fontSize: 11, fontWeight: "700" },
-  tooltip: { borderRadius: 6, gap: 3, paddingHorizontal: 8, paddingVertical: 7, width: 150 },
+  tooltip: { borderRadius: 6, left: 52, minWidth: 128, paddingHorizontal: 8, paddingVertical: 7, position: "absolute", top: 5 },
   tooltipMonth: { fontSize: 11, fontWeight: "800", marginBottom: 1 },
   tooltipRow: { alignItems: "center", flexDirection: "row", gap: 5 },
   tooltipDot: { borderRadius: 3, height: 6, width: 6 },
-  tooltipText: { flex: 1, fontSize: 10, fontVariant: ["tabular-nums"] },
+  tooltipText: { fontSize: 10, fontVariant: ["tabular-nums"] },
 });

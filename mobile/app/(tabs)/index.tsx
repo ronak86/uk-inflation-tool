@@ -354,7 +354,7 @@ export default function ExplorerScreen() {
                 onPress={(event) => { event.stopPropagation(); setChartItem(row.item); }}
                 style={styles.chartButton}
               >
-                <SymbolView name="chart.xyaxis.line" tintColor={headline ? "#FFFFFF" : colors.blue} size={17} />
+                <SymbolView name="chart.bar" tintColor={headline ? "#FFFFFF" : colors.blue} size={17} />
               </Pressable>
             </Pressable>
           );
